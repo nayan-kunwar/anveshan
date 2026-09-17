@@ -18,6 +18,7 @@
     "@anveshan/domain": "workspace:*",
     "@anveshan/notifications": "workspace:*",
     "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.36.0",
     "express": "^4.21.1",
     "node-cron": "^3.0.3",
     "pg": "^8.13.0",

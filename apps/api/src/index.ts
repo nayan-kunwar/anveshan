@@ -5,6 +5,7 @@ import { createMailTransport, createSendMail } from "@anveshan/notifications";
 import { createApp } from "./app.js";
 import { startScheduler } from "./collection/scheduler.js";
 import { createLogger } from "./logger.js";
+import { startDeliveryInterval, startDigestCron } from "./notifications/worker.js";
 import { createDrizzleProgramStore } from "./services/store.js";
 
 async function main(): Promise<void> {
@@ -33,6 +34,11 @@ async function main(): Promise<void> {
         };
 
   startScheduler({ config, pool, logger });
+
+  // Milestone 2: delivery worker (outbox drain) + daily digest cron.
+  // Both no-op when NOTIFICATIONS_ENABLED=false.
+  startDeliveryInterval({ db, config, logger, sendMail });
+  startDigestCron({ db, config, logger });
 
   const app = createApp({
     store: createDrizzleProgramStore(db),

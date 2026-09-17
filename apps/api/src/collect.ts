@@ -1,7 +1,8 @@
 import { initLocalEnv, loadConfig } from "@anveshan/config";
-import { closePool, getPool } from "@anveshan/database";
+import { closePool, createDb, getPool } from "@anveshan/database";
 import { runCollection } from "./collection/service.js";
 import { createLogger } from "./logger.js";
+import { enqueueAfterCollection } from "./notifications/enqueue.js";
 
 /**
  * pnpm collect — manual collection. Calls the same runCollection()
@@ -14,6 +15,8 @@ async function main(): Promise<void> {
   const pool = getPool(config.DATABASE_URL);
   try {
     const summary = await runCollection({ config, pool, logger });
+    // Never throws (own try/catch inside): exit code reflects collection only.
+    await enqueueAfterCollection({ db: createDb(pool), config, logger }, summary);
     process.stdout.write(
       [
         `status: ${summary.status}`,

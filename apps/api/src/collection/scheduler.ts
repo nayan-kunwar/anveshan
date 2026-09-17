@@ -3,6 +3,8 @@ import cron from "node-cron";
 import type { Pool } from "pg";
 import type { Logger } from "pino";
 import type { ProgramCollector } from "@anveshan/collector";
+import { createDb } from "@anveshan/database";
+import { enqueueAfterCollection } from "../notifications/enqueue.js";
 import { runCollection } from "./service.js";
 
 export interface SchedulerDeps {
@@ -19,7 +21,7 @@ export interface SchedulerDeps {
  * COLLECTION_ENABLED=false).
  */
 export function startScheduler(deps: SchedulerDeps): cron.ScheduledTask | null {
-  const { config, logger } = deps;
+  const { config, pool, logger } = deps;
   if (!config.COLLECTION_ENABLED) {
     logger.info("collection scheduler disabled (COLLECTION_ENABLED=false)");
     return null;
@@ -30,9 +32,19 @@ export function startScheduler(deps: SchedulerDeps): cron.ScheduledTask | null {
   const task = cron.schedule(
     config.COLLECTION_CRON,
     () => {
-      runCollection(deps).catch((error: unknown) => {
-        logger.error({ err: error }, "scheduled collection crashed");
-      });
+      runCollection(deps)
+        .then((summary) => {
+          // Own chain: enqueue failure must never log "scheduled collection
+          // crashed" — collection already committed. Catch-up retries.
+          enqueueAfterCollection({ db: createDb(pool), config, logger }, summary).catch(
+            (error: unknown) => {
+              logger.error({ err: error }, "post-collection enqueue failed");
+            },
+          );
+        })
+        .catch((error: unknown) => {
+          logger.error({ err: error }, "scheduled collection crashed");
+        });
     },
     { timezone: config.COLLECTION_TZ },
   );
