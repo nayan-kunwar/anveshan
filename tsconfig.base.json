@@ -16,7 +16,6 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noEmitOnError": true,
-    "baseUrl": ".",
     "paths": {
       "@anveshan/config": ["./packages/config/src/index.ts"],
       "@anveshan/domain": ["./packages/domain/src/index.ts"],
