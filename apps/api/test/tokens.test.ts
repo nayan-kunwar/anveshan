@@ -35,8 +35,8 @@ describe("auth tokens", () => {
 
   it("verifyUnsubscribe rejects wrong user", () => {
     const token = signUnsubscribe(USER_ID, SECRET);
-    expect(
-      verifyUnsubscribe("99999999-2222-3333-4444-555555555555", token, SECRET),
-    ).toBe(false);
+    expect(verifyUnsubscribe("99999999-2222-3333-4444-555555555555", token, SECRET)).toBe(
+      false,
+    );
   });
 });
