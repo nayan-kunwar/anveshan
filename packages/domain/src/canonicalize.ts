@@ -55,42 +55,53 @@ function canonicalizeUrl(raw: string): string | null {
 }
 
 /**
+ * Explicit HackerOne `asset_type` (uppercased) → internal AssetType.
+ * Grounded in live API responses (Sep 2026), not guesses.
+ */
+const HACKERONE_ASSET_TYPE_MAP: Record<string, AssetType> = {
+  URL: "URL",
+  WILDCARD: "WILDCARD",
+  DOMAIN: "DOMAIN",
+  CIDR: "CIDR",
+  IP: "IP",
+  IP_ADDRESS: "IP",
+  API: "API",
+  ANDROID_PLAY_STORE: "ANDROID",
+  ANDROID_APK: "ANDROID",
+  ANDROID: "ANDROID",
+  GOOGLE_PLAY_APP_ID: "ANDROID",
+  OTHER_APK: "ANDROID",
+  IOS_APP_STORE: "IOS",
+  IOS_TESTFLIGHT: "IOS",
+  IOS_IPA: "IOS",
+  IOS: "IOS",
+  APPLE_STORE_APP_ID: "IOS",
+  TESTFLIGHT: "IOS",
+  OTHER_IPA: "IOS",
+  SOURCE_CODE: "OTHER",
+  SOURCECODE: "OTHER",
+  HARDWARE: "OTHER",
+  EXECUTABLE: "OTHER",
+  WINDOWS_MICROSOFT_STORE: "OTHER",
+  WINDOWS_APP_STORE_APP_ID: "OTHER",
+  DOWNLOADABLE_EXECUTABLES: "OTHER",
+  SMART_CONTRACT: "OTHER",
+  AI_MODEL: "OTHER",
+  OTHER: "OTHER",
+  OTHER_ASSET: "OTHER",
+};
+
+/**
  * Map a raw HackerOne `asset_type` string to the internal AssetType.
  * Unknown / missing values map to OTHER (never throws).
  */
 export function mapHackerOneAssetType(raw: unknown): AssetType {
   if (typeof raw !== "string") return "OTHER";
-  const v = raw.toUpperCase().trim();
-  switch (v) {
-    case "URL":
-      return "URL";
-    case "WILDCARD":
-      return "WILDCARD";
-    case "DOMAIN":
-      return "DOMAIN";
-    case "CIDR":
-      return "CIDR";
-    case "IP":
-    case "IP_ADDRESS":
-      return "IP";
-    case "ANDROID_PLAY_STORE":
-    case "ANDROID_APK":
-    case "ANDROID":
-      return "ANDROID";
-    case "IOS_APP_STORE":
-    case "IOS_TESTFLIGHT":
-    case "IOS_IPA":
-    case "IOS":
-      return "IOS";
-    case "SOURCE_CODE":
-    case "SOURCECODE":
-    case "HARDWARE":
-    case "EXECUTABLE":
-    case "WINDOWS_MICROSOFT_STORE":
-    case "OTHER":
-    case "OTHER_ASSET":
-      return "OTHER";
-    default:
-      return "OTHER";
-  }
+  return HACKERONE_ASSET_TYPE_MAP[raw.toUpperCase().trim()] ?? "OTHER";
+}
+
+/** True when the raw value is explicitly mapped (no warning needed). */
+export function isKnownHackerOneAssetType(raw: unknown): boolean {
+  if (typeof raw !== "string") return false;
+  return raw.toUpperCase().trim() in HACKERONE_ASSET_TYPE_MAP;
 }

@@ -202,26 +202,29 @@ The collector must respect HackerOne rate limits.
 HackerOne `asset_type` values are case-insensitive. Normalize with
 `toUpperCase().trim()` first, then map:
 
-| HackerOne `asset_type`                                 | Internal `AssetType` |
-| ------------------------------------------------------ | -------------------- |
-| `URL`                                                  | `URL`                |
-| `WILDCARD`                                             | `WILDCARD`           |
-| `DOMAIN`                                               | `DOMAIN`             |
-| `CIDR`                                                 | `CIDR`               |
-| `IP` / `IP_ADDRESS`                                    | `IP`                 |
-| `ANDROID_PLAY_STORE` / `ANDROID_APK` / `ANDROID`       | `ANDROID`            |
-| `IOS_APP_STORE` / `IOS_TESTFLIGHT` / `IOS_IPA` / `IOS` | `IOS`                |
-| `SOURCE_CODE` / `SOURCECODE`                           | `OTHER`              |
-| `HARDWARE`                                             | `OTHER`              |
-| `EXECUTABLE` / `WINDOWS_MICROSOFT_STORE`               | `OTHER`              |
-| `OTHER` / `OTHER_ASSET` / unknown / missing            | `OTHER`              |
+| HackerOne `asset_type`                                  | Internal `AssetType` |
+| ------------------------------------------------------- | -------------------- |
+| `URL`                                                   | `URL`                |
+| `WILDCARD`                                              | `WILDCARD`           |
+| `DOMAIN`                                                | `DOMAIN`             |
+| `CIDR`                                                  | `CIDR`               |
+| `IP` / `IP_ADDRESS`                                     | `IP`                 |
+| `API`                                                   | `API`                |
+| `ANDROID_PLAY_STORE` / `ANDROID_APK` / `ANDROID`        | `ANDROID`            |
+| `GOOGLE_PLAY_APP_ID` / `OTHER_APK`                      | `ANDROID`            |
+| `IOS_APP_STORE` / `IOS_TESTFLIGHT` / `IOS_IPA` / `IOS`  | `IOS`                |
+| `APPLE_STORE_APP_ID` / `TESTFLIGHT` / `OTHER_IPA`       | `IOS`                |
+| `SOURCE_CODE` / `SOURCECODE`                            | `OTHER`              |
+| `HARDWARE`                                              | `OTHER`              |
+| `EXECUTABLE` / `WINDOWS_MICROSOFT_STORE`                | `OTHER`              |
+| `WINDOWS_APP_STORE_APP_ID` / `DOWNLOADABLE_EXECUTABLES` | `OTHER`              |
+| `SMART_CONTRACT` / `AI_MODEL`                           | `OTHER`              |
+| `OTHER` / `OTHER_ASSET`                                 | `OTHER`              |
+| unknown / missing                                       | `OTHER` (warn)       |
 
-Unmapped values MUST map to `OTHER`, never throw. Log at `warn`
-with program handle + raw value (no secrets).
-
-`API` internal type is reserved for future explicit API assets;
-HackerOne URL assets that are clearly API endpoints stay `URL` in MVP.
-Do not guess.
+Unmapped values MUST map to `OTHER`, never throw. Warn only for
+values absent from this table (explicit `OTHER` mappings stay silent).
+Log at `warn` with program handle + raw value (no secrets).
 
 ## Scope rule (HackerOne)
 

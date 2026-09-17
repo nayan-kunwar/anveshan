@@ -44,8 +44,15 @@ describe("mapHackerOneAssetType", () => {
     expect(mapHackerOneAssetType("URL")).toBe("URL");
     expect(mapHackerOneAssetType("wildcard")).toBe("WILDCARD");
     expect(mapHackerOneAssetType("ANDROID_PLAY_STORE")).toBe("ANDROID");
+    expect(mapHackerOneAssetType("GOOGLE_PLAY_APP_ID")).toBe("ANDROID");
+    expect(mapHackerOneAssetType("OTHER_APK")).toBe("ANDROID");
     expect(mapHackerOneAssetType("IOS_TESTFLIGHT")).toBe("IOS");
+    expect(mapHackerOneAssetType("APPLE_STORE_APP_ID")).toBe("IOS");
+    expect(mapHackerOneAssetType("OTHER_IPA")).toBe("IOS");
     expect(mapHackerOneAssetType("CIDR")).toBe("CIDR");
+    expect(mapHackerOneAssetType("API")).toBe("API");
+    expect(mapHackerOneAssetType("DOWNLOADABLE_EXECUTABLES")).toBe("OTHER");
+    expect(mapHackerOneAssetType("SMART_CONTRACT")).toBe("OTHER");
   });
 
   it("maps unknown or missing values to OTHER without throwing", () => {

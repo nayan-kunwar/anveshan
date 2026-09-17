@@ -4,6 +4,7 @@ import {
   canonicalize,
   collectedAssetSchema,
   collectedProgramSchema,
+  isKnownHackerOneAssetType,
   mapHackerOneAssetType,
 } from "@anveshan/domain";
 import type { HackerOneClient, ScopeItem } from "./client.js";
@@ -75,7 +76,7 @@ function normalizeScope(
     return null;
   }
   const type = mapHackerOneAssetType(item.assetType);
-  if (typeof item.assetType === "string" && type === "OTHER") {
+  if (typeof item.assetType === "string" && !isKnownHackerOneAssetType(item.assetType)) {
     logger.warn("Unmapped HackerOne asset_type, kept as OTHER", {
       programHandle,
       scopeId: item.id,
