@@ -51,6 +51,12 @@ See `.env.example` (source of truth). Key vars:
     LOG_LEVEL=info
     PORT=3000
 
+Milestone 2 adds: `SMTP_*`, `MAGIC_LINK_SECRET`, `SESSION_SECRET`,
+`UNSUBSCRIBE_SECRET`, `FRONTEND_URL`, `NOTIFICATIONS_ENABLED` (default
+false), `AUTH_EMAIL_ENABLED` (derived from `SMTP_*` when unset),
+`DAILY_DIGEST_CRON`, `IMMEDIATE_EMAIL_CAP`, `ASSET_EMAIL_CAP`.
+See `.env.example` (source of truth).
+
 Validation: `packages/config` with Zod. Fail fast on boot if invalid.
 Never log secrets.
 

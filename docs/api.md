@@ -43,16 +43,19 @@ All errors return a consistent JSON shape:
 }
 ```
 
-| Code                | Status | Meaning                                   |
-| ------------------- | ------ | ----------------------------------------- |
-| `BAD_REQUEST`       | 400    | Invalid query parameters (Zod validation) |
-| `PROGRAM_NOT_FOUND` | 404    | No program with that UUID                 |
-| `INTERNAL`          | 500    | Unexpected server error                   |
-| `COLLECTION_FAILED` | 500    | Background collection run failed          |
-| `AUTH_FAILED`       | 500    | HackerOne API credentials invalid         |
-| `RATE_LIMITED`      | 500    | HackerOne API rate limit hit              |
-| `NETWORK`           | 500    | Network error reaching HackerOne          |
-| `TIMEOUT`           | 500    | HackerOne API request timed out           |
+| Code                 | Status | Meaning                                   |
+| -------------------- | ------ | ----------------------------------------- |
+| `BAD_REQUEST`        | 400    | Invalid query parameters (Zod validation) |
+| `PROGRAM_NOT_FOUND`  | 404    | No program with that UUID                 |
+| `INTERNAL`           | 500    | Unexpected server error                   |
+| `COLLECTION_FAILED`  | 500    | Background collection run failed          |
+| `AUTH_FAILED`        | 500    | HackerOne API credentials invalid         |
+| `RATE_LIMITED`       | 500    | HackerOne API rate limit hit              |
+| `NETWORK`            | 500    | Network error reaching HackerOne          |
+| `TIMEOUT`            | 500    | HackerOne API request timed out           |
+| `UNAUTHORIZED`       | 401    | Missing, invalid, or expired session      |
+| `INVALID_TOKEN`      | 401    | Bad magic-link or unsubscribe token       |
+| `EMAIL_RATE_LIMITED` | 429    | Too many magic-link requests              |
 
 ---
 
@@ -382,6 +385,68 @@ curl "http://localhost:3000/api/v1/programs/00000000-0000-0000-0000-000000000000
   }
 }
 ```
+
+---
+
+## Authentication (Milestone 2)
+
+Passwordless magic links. Session cookie (`session`, HttpOnly, SameSite=Lax)
+is set on verify; send it back on authenticated calls.
+
+```bash
+# 1. Request a sign-in link (always 200, even for unknown emails)
+curl -X POST http://localhost:3000/api/v1/auth/request-magic-link \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com"}'
+
+# 2. Verify the token from the email link
+curl -X POST http://localhost:3000/api/v1/auth/verify \
+  -H "Content-Type: application/json" \
+  -d '{"token":"..."}' -c cookies.txt
+
+# 3. Authenticated calls use the cookie
+curl http://localhost:3000/api/v1/auth/me -b cookies.txt
+
+# 4. Logout
+curl -X POST http://localhost:3000/api/v1/auth/logout -b cookies.txt
+```
+
+---
+
+## Subscriptions (Milestone 2)
+
+One subscription per user: cadence (`immediate` | `daily`), a per-program
+watch list, and two flags. No subscription row (or `unsubscribed_at` set)
+means no mail. Empty watches + `watch_all_programs=false` means no mail —
+`PROGRAM_ADDED` needs the separate `watch_new_programs` flag.
+
+```bash
+COOKIE="-b cookies.txt"
+
+# Get my subscription (null when none)
+curl http://localhost:3000/api/v1/subscriptions $COOKIE
+
+# Save subscription (also clears any unsubscribe opt-out)
+curl -X PUT http://localhost:3000/api/v1/subscriptions $COOKIE \
+  -H "Content-Type: application/json" \
+  -d '{"frequency":"daily","watchNewPrograms":true,"watchAllPrograms":false}'
+
+# Watch a program (404 when the id is unknown)
+curl -X POST http://localhost:3000/api/v1/subscriptions/watches $COOKIE \
+  -H "Content-Type: application/json" \
+  -d '{"programId":"{uuid}"}'
+
+# List / remove watches
+curl http://localhost:3000/api/v1/subscriptions/watches $COOKIE
+curl -X DELETE http://localhost:3000/api/v1/subscriptions/watches/{uuid} $COOKIE
+
+# Unsubscribe without logging in (token from the email link)
+curl -X POST http://localhost:3000/api/v1/unsubscribe \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"{uuid}","token":"{hmac}"}'
+```
+
+Full contract: `docs/openapi.yaml`. Design: `docs/notification-design.md`.
 
 ---
 

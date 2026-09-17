@@ -78,18 +78,22 @@ Web scraping, RSS, webhooks, and other collectors are planned for later mileston
 
     apps/
       api/
+      web/          # Milestone 2 subscriber frontend (Next.js)
 
     packages/
       collector/
       database/
       domain/
       config/
+      notifications/  # Milestone 2 SMTP transport + email templates
 
     docs/
+      api.md
       architecture.md
       collector.md
       database.md
       development.md
+      notification-design.md  # Milestone 2
       snapshot-algorithm.md
       openapi.yaml
       decisions/
@@ -153,16 +157,20 @@ In production, one process runs everything: Express API + cron scheduler + Hacke
     │                                                    │
     │  Express API (port 3000)                           │
     │    ├── GET /health                                 │
-    │    ├── GET /api/v1/programs                        │
-    │    ├── GET /api/v1/programs/:id                    │
-    │    ├── GET /api/v1/programs/:id/assets             │
-    │    └── GET /api/v1/programs/:id/changes            │
+    │    ├── GET /api/v1/programs (+ assets, changes)    │
+    │    ├── POST /api/v1/auth/* (magic link)            │
+    │    └── subscriptions + watches + unsubscribe       │
     │                                                    │
     │  node-cron scheduler                               │
     │    └── every 30 min → runCollection()              │
     │         ├── fetch from HackerOne API               │
     │         ├── diff against previous state            │
     │         └── persist programs, assets, changes      │
+    │                                                    │
+    │  Milestone 2 notification paths                    │
+    │    ├── post-collection enqueue (outbox rows)       │
+    │    ├── delivery worker (30s drain → SMTP)          │
+    │    └── daily digest cron (08:00 UTC)               │
     └──────────────────────────────────────────────────┘
 
 ### Deploy with Docker
@@ -173,10 +181,12 @@ In production, one process runs everything: Express API + cron scheduler + Hacke
     # 2. Build and start
     docker compose --profile api up -d --build
 
-This starts two containers:
+This starts three containers:
 
 - `anveshan-postgres` — Postgres 16 (persistent volume `pgdata`)
 - `anveshan-api` — your app (built from `apps/api/Dockerfile`)
+- `anveshan-web` — subscriber frontend (built from `apps/web/Dockerfile`,
+  port 3001, proxies `/api/*` to the api service)
 
 ### Deploy without Docker (bare metal / VPS)
 
@@ -237,7 +247,9 @@ The process handles `SIGINT` and `SIGTERM`:
 
 ## API
 
-All endpoints are read-only. Full reference with curl examples in [`docs/api.md`](docs/api.md).
+Program/asset/change reads are public and read-only. Auth, subscription,
+and watch endpoints need a session (magic link). Full reference with curl
+examples in [`docs/api.md`](docs/api.md).
 
 | Endpoint                           | Description                           |
 | ---------------------------------- | ------------------------------------- |
@@ -246,6 +258,9 @@ All endpoints are read-only. Full reference with curl examples in [`docs/api.md`
 | `GET /api/v1/programs/:id`         | Get program by UUID                   |
 | `GET /api/v1/programs/:id/assets`  | List program assets (filter by scope) |
 | `GET /api/v1/programs/:id/changes` | List detected changes                 |
+
+Milestone 2 adds: `POST /api/v1/auth/*` (magic link),
+`GET/PUT /api/v1/subscriptions`, watch CRUD, `POST /api/v1/unsubscribe`.
 
 ## Change Types
 
@@ -257,14 +272,13 @@ Currently supported:
 
 ## What Anveshan does not currently do
 
-The current MVP does not:
+Anveshan does not:
 
 - scan targets
 - find vulnerabilities
 - exploit vulnerabilities
 - enumerate subdomains
 - perform brute force
-- send notifications
 - scrape websites
 - consume RSS
 - consume webhooks
@@ -280,6 +294,7 @@ Technical documentation is available in:
 See:
 
 - [`docs/api.md`](docs/api.md)
+- [`docs/notification-design.md`](docs/notification-design.md)
 - `docs/architecture.md`
 - `docs/collector.md`
 - `docs/database.md`

@@ -121,10 +121,259 @@ paths:
                     $ref: "#/components/schemas/Pagination"
         "404":
           $ref: "#/components/responses/ProgramNotFound"
+  /api/v1/auth/request-magic-link:
+    post:
+      summary: Send a one-time sign-in link (rate-limited per IP + email)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 320
+      responses:
+        "200":
+          description: Always 200 (no email oracle), even when mail is not sent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/EmailRateLimited"
+  /api/v1/auth/verify:
+    post:
+      summary: Verify a magic-link token, create a session, set cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        "200":
+          description: "Authenticated user (Set-Cookie: session)"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/InvalidToken"
+  /api/v1/auth/me:
+    get:
+      summary: Current session user
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/auth/logout:
+    post:
+      summary: Delete the current session, clear cookie
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/subscriptions:
+    get:
+      summary: Get my subscription config (null when none)
+      responses:
+        "200":
+          description: Subscription or null
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Subscription"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      summary: Save subscription (also clears any unsubscribe opt-out)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [frequency, watchNewPrograms, watchAllPrograms]
+              properties:
+                frequency:
+                  type: string
+                  enum: [immediate, daily]
+                watchNewPrograms:
+                  type: boolean
+                watchAllPrograms:
+                  type: boolean
+      responses:
+        "200":
+          description: Saved subscription
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Subscription"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/subscriptions/watches:
+    get:
+      summary: List my watched programs
+      responses:
+        "200":
+          description: Watched programs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WatchedProgram"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Watch a program (404 when the program id is unknown)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [programId]
+              properties:
+                programId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Watched
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ProgramNotFound"
+  /api/v1/subscriptions/watches/{programId}:
+    delete:
+      summary: Remove a program from my watch list (idempotent)
+      parameters:
+        - $ref: "#/components/parameters/WatchProgramId"
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/unsubscribe:
+    post:
+      summary: Global unsubscribe via signed link token (no login)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, token]
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                token:
+                  type: string
+      responses:
+        "200":
+          description: Unsubscribed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/InvalidToken"
 components:
   parameters:
     ProgramId:
       name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    WatchProgramId:
+      name: programId
       in: path
       required: true
       schema:
@@ -228,6 +477,49 @@ components:
           type: integer
         total:
           type: integer
+    User:
+      type: object
+      required: [id, email, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        emailVerifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    Subscription:
+      type: object
+      nullable: true
+      required: [frequency, watchNewPrograms, watchAllPrograms]
+      properties:
+        frequency:
+          type: string
+          enum: [immediate, daily]
+        watchNewPrograms:
+          type: boolean
+        watchAllPrograms:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+    WatchedProgram:
+      type: object
+      required: [programId, name, externalId]
+      properties:
+        programId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        externalId:
+          type: string
     Error:
       type: object
       required: [error]
@@ -248,6 +540,9 @@ components:
                   RATE_LIMITED,
                   NETWORK,
                   TIMEOUT,
+                  UNAUTHORIZED,
+                  INVALID_TOKEN,
+                  EMAIL_RATE_LIMITED,
                 ]
             message:
               type: string
@@ -260,6 +555,24 @@ components:
             $ref: "#/components/schemas/Error"
     ProgramNotFound:
       description: Program not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing, invalid, or expired session
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidToken:
+      description: Bad magic-link or unsubscribe token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    EmailRateLimited:
+      description: Too many magic-link requests
       content:
         application/json:
           schema:
