@@ -1,3 +1,7 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { config as dotenvConfig } from "dotenv";
 import { z } from "zod";
 
 const booleanFromString = z
@@ -36,6 +40,44 @@ export const envSchema = z.object({
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
+
+/**
+ * Load the repo-root `.env` regardless of the invoking working directory.
+ *
+ * `dotenv/config` resolves `./.env` against CWD, which breaks under
+ * `pnpm --filter` (CWD becomes the package dir). This walks up from the
+ * caller's file to the workspace root (marked by `pnpm-workspace.yaml`)
+ * and loads `<root>/.env`. Single source of truth: no per-package `.env`.
+ *
+ * Shell-exported variables always win (dotenv never overrides them).
+ * Missing file is silent, matching dotenv defaults.
+ *
+ * Pass `import.meta.url` of the entry point. Call before `loadConfig()`.
+ */
+export function initLocalEnv(entryUrl: string | URL): string | null {
+  let dir: string;
+  try {
+    dir = dirname(fileURLToPath(entryUrl));
+  } catch {
+    // No usable file URL (e.g. tsx -e / REPL): fall back to CWD behavior.
+    dotenvConfig();
+    return null;
+  }
+  for (let depth = 0; depth < 6; depth += 1) {
+    if (existsSync(join(dir, "pnpm-workspace.yaml"))) {
+      const envPath = join(dir, ".env");
+      if (existsSync(envPath)) {
+        dotenvConfig({ path: envPath });
+        return envPath;
+      }
+      return null;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   // Treat blank template values as unset so read-only commands boot

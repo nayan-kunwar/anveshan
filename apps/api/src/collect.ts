@@ -1,5 +1,4 @@
-import "dotenv/config";
-import { loadConfig } from "@anveshan/config";
+import { initLocalEnv, loadConfig } from "@anveshan/config";
 import { closePool, getPool } from "@anveshan/database";
 import { runCollection } from "./collection/service.js";
 import { createLogger } from "./logger.js";
@@ -9,6 +8,7 @@ import { createLogger } from "./logger.js";
  * as the node-cron scheduler, then prints a summary.
  */
 async function main(): Promise<void> {
+  initLocalEnv(import.meta.url);
   const config = loadConfig();
   const logger = createLogger({ LOG_LEVEL: config.LOG_LEVEL });
   const pool = getPool(config.DATABASE_URL);

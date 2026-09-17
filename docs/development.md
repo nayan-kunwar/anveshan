@@ -54,6 +54,12 @@ See `.env.example` (source of truth). Key vars:
 Validation: `packages/config` with Zod. Fail fast on boot if invalid.
 Never log secrets.
 
+Single root `.env` is the only file-based config. Entry points
+(`apps/api`, `pnpm collect`, `pnpm db:migrate`) resolve it from the
+repo root via `initLocalEnv()` regardless of invoking directory —
+never add per-package `.env` files. Shell-exported variables win
+over the file; tests ignore the file entirely (hermetic).
+
 ## Docker
 
 `docker-compose.yml` services:

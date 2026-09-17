@@ -1,5 +1,4 @@
-import "dotenv/config";
-import { loadConfig } from "@anveshan/config";
+import { initLocalEnv, loadConfig } from "@anveshan/config";
 import { closePool, createDb, getPool } from "@anveshan/database";
 import { createApp } from "./app.js";
 import { startScheduler } from "./collection/scheduler.js";
@@ -7,6 +6,7 @@ import { createLogger } from "./logger.js";
 import { createDrizzleProgramStore } from "./services/store.js";
 
 async function main(): Promise<void> {
+  initLocalEnv(import.meta.url);
   const config = loadConfig();
   const logger = createLogger(config);
   const pool = getPool(config.DATABASE_URL);

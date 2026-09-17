@@ -1,4 +1,4 @@
-import { loadConfig } from "@anveshan/config";
+import { initLocalEnv, loadConfig } from "@anveshan/config";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { fileURLToPath } from "node:url";
@@ -22,6 +22,7 @@ export async function runMigrations(databaseUrl: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  initLocalEnv(import.meta.url);
   const config = loadConfig();
   await runMigrations(config.DATABASE_URL);
   process.stdout.write("migrations applied\n");
