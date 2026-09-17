@@ -4,7 +4,7 @@ import prettier from "eslint-config-prettier";
 import { defineConfig } from "eslint/config";
 
 export default defineConfig(
-  { ignores: ["**/dist/**", "**/node_modules/**", "**/drizzle/**"] },
+  { ignores: ["**/dist/**", "**/node_modules/**", "**/drizzle/**", "**/.next/**"] },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   prettier,
@@ -34,6 +34,13 @@ export default defineConfig(
       // Supertest bodies are `any` by design; tests assert shapes at runtime.
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
+    },
+  },
+  {
+    // Next.js generated file (triple-slash references are its format).
+    files: ["apps/web/next-env.d.ts"],
+    rules: {
+      "@typescript-eslint/triple-slash-reference": "off",
     },
   },
 );

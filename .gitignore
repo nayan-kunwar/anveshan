@@ -3,6 +3,8 @@
 .env.local
 node_modules/
 dist/
+.next/
+*.tsbuildinfo
 build/
 coverage/
 .husky/_/

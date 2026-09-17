@@ -36,5 +36,23 @@ services:
     profiles:
       - api
 
+  # Optional: subscriber frontend (Milestone 2). Proxies /api/* to the
+  # api service, so the session cookie stays first-party.
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: anveshan-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      - API_INTERNAL_URL=http://api:3000
+      - PORT=3001
+    ports:
+      - "3001:3001"
+    profiles:
+      - api
+
 volumes:
   pgdata:
