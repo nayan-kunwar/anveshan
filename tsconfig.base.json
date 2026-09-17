@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noEmitOnError": true,
+    "baseUrl": ".",
+    "paths": {
+      "@anveshan/config": ["./packages/config/src/index.ts"],
+      "@anveshan/domain": ["./packages/domain/src/index.ts"],
+      "@anveshan/database": ["./packages/database/src/index.ts"],
+      "@anveshan/collector": ["./packages/collector/src/index.ts"]
+    }
+  }
+}

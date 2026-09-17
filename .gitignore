@@ -1,0 +1,11 @@
+# Anveshan gitignore — never commit secrets or build output.
+.env
+.env.local
+node_modules/
+dist/
+build/
+coverage/
+.husky/_/
+pgdata/
+*.log
+.DS_Store

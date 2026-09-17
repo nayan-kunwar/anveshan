@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: anveshan-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: anveshan
+      POSTGRES_PASSWORD: anveshan
+      POSTGRES_DB: anveshan
+    ports:
+      # Host 5432 is commonly taken by a native Postgres; map 5433.
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anveshan -d anveshan"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Optional: run the API in Docker (MVP default is local `pnpm dev`
+  # with only postgres in Docker).
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: anveshan-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    profiles:
+      - api
+
+volumes:
+  pgdata:
