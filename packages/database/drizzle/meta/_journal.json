@@ -8,6 +8,13 @@
       "when": 1789585613006,
       "tag": "0000_steady_radioactive_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789670574238,
+      "tag": "0001_last_madame_hydra",
+      "breakpoints": true
     }
   ]
 }

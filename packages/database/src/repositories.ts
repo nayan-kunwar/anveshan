@@ -1,12 +1,38 @@
-import { and, count, desc, eq, gte, lt, notInArray, sql } from "drizzle-orm";
-import type { AssetRow, NewChangeRow, ProgramRow } from "./schema.js";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  lt,
+  notInArray,
+  sql,
+} from "drizzle-orm";
+import type {
+  AssetRow,
+  DeliveryRow,
+  MagicLinkTokenRow,
+  NewChangeRow,
+  ProgramRow,
+  SessionRow,
+  SubscriptionRow,
+  UserRow,
+} from "./schema.js";
 import {
   assetSnapshots,
   assets,
   changes,
   collectionRuns,
+  magicLinkTokens,
+  notificationDeliveries,
   programSnapshots,
   programs,
+  sessions,
+  subscriptions,
+  users,
+  watches,
 } from "./schema.js";
 import type { Db } from "./db.js";
 
@@ -322,6 +348,487 @@ export async function listChanges(
 /** Test helper: wipe all rows (never used in production code paths). */
 export async function truncateAll(db: Db): Promise<void> {
   await db.execute(
-    sql`TRUNCATE changes, asset_snapshots, program_snapshots, assets, programs, collection_runs`,
+    sql`TRUNCATE notification_deliveries, watches, subscriptions, sessions, magic_link_tokens, users, changes, asset_snapshots, program_snapshots, assets, programs, collection_runs`,
   );
+}
+
+// --- Milestone 2: users ---
+
+export async function upsertUserByEmail(db: Db, email: string): Promise<UserRow> {
+  const lower = email.toLowerCase();
+  const inserted = await db
+    .insert(users)
+    .values({ email: lower })
+    .onConflictDoNothing({ target: users.email })
+    .returning();
+  if (inserted[0]) return inserted[0];
+  const rows = await db.select().from(users).where(eq(users.email, lower)).limit(1);
+  const row = rows[0];
+  if (!row) throw new Error("upsertUserByEmail returned no row");
+  return row;
+}
+
+export async function findUserById(db: Db, id: string): Promise<UserRow | undefined> {
+  const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function findUserByEmail(
+  db: Db,
+  email: string,
+): Promise<UserRow | undefined> {
+  const rows = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email.toLowerCase()))
+    .limit(1);
+  return rows[0];
+}
+
+/** Set email_verified_at on first successful verify; preserves the original. */
+export async function verifyUserEmail(db: Db, userId: string): Promise<void> {
+  await db
+    .update(users)
+    .set({ emailVerifiedAt: new Date() })
+    .where(and(eq(users.id, userId), isNull(users.emailVerifiedAt)));
+}
+
+export async function setUnsubscribed(db: Db, userId: string): Promise<void> {
+  await db.update(users).set({ unsubscribedAt: new Date() }).where(eq(users.id, userId));
+}
+
+export async function clearUnsubscribed(db: Db, userId: string): Promise<void> {
+  await db.update(users).set({ unsubscribedAt: null }).where(eq(users.id, userId));
+}
+
+// --- Milestone 2: magic-link tokens ---
+
+export async function insertMagicLinkToken(
+  db: Db,
+  userId: string,
+  tokenHash: string,
+  expiresAt: Date,
+): Promise<MagicLinkTokenRow> {
+  const rows = await db
+    .insert(magicLinkTokens)
+    .values({ userId, tokenHash, expiresAt })
+    .returning();
+  const row = rows[0];
+  if (!row) throw new Error("insertMagicLinkToken returned no row");
+  return row;
+}
+
+export async function findValidMagicLinkToken(
+  db: Db,
+  tokenHash: string,
+): Promise<MagicLinkTokenRow | undefined> {
+  const rows = await db
+    .select()
+    .from(magicLinkTokens)
+    .where(
+      and(
+        eq(magicLinkTokens.tokenHash, tokenHash),
+        isNull(magicLinkTokens.consumedAt),
+        gte(magicLinkTokens.expiresAt, new Date()),
+      ),
+    )
+    .limit(1);
+  return rows[0];
+}
+
+export async function consumeMagicLinkToken(db: Db, id: string): Promise<void> {
+  await db
+    .update(magicLinkTokens)
+    .set({ consumedAt: new Date() })
+    .where(eq(magicLinkTokens.id, id));
+}
+
+/** Invalidate all unconsumed tokens for a user (called when issuing a new link). */
+export async function invalidateUserTokens(db: Db, userId: string): Promise<number> {
+  const rows = await db
+    .update(magicLinkTokens)
+    .set({ consumedAt: new Date() })
+    .where(and(eq(magicLinkTokens.userId, userId), isNull(magicLinkTokens.consumedAt)))
+    .returning({ id: magicLinkTokens.id });
+  return rows.length;
+}
+
+// --- Milestone 2: sessions ---
+
+export async function insertSession(
+  db: Db,
+  userId: string,
+  tokenHash: string,
+  expiresAt: Date,
+): Promise<SessionRow> {
+  const rows = await db
+    .insert(sessions)
+    .values({ userId, tokenHash, expiresAt })
+    .returning();
+  const row = rows[0];
+  if (!row) throw new Error("insertSession returned no row");
+  return row;
+}
+
+export async function findSessionByHash(
+  db: Db,
+  tokenHash: string,
+): Promise<SessionRow | undefined> {
+  const rows = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.tokenHash, tokenHash))
+    .limit(1);
+  return rows[0];
+}
+
+export async function deleteSessionByHash(db: Db, tokenHash: string): Promise<void> {
+  await db.delete(sessions).where(eq(sessions.tokenHash, tokenHash));
+}
+
+// --- Milestone 2: subscriptions + watches ---
+
+export interface UpsertSubscriptionInput {
+  frequency: "immediate" | "daily";
+  watchNewPrograms: boolean;
+  watchAllPrograms: boolean;
+}
+
+export async function upsertSubscription(
+  db: Db,
+  userId: string,
+  input: UpsertSubscriptionInput,
+): Promise<SubscriptionRow> {
+  const rows = await db
+    .insert(subscriptions)
+    .values({ userId, ...input, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: subscriptions.userId,
+      set: { ...input, updatedAt: new Date() },
+    })
+    .returning();
+  const row = rows[0];
+  if (!row) throw new Error("upsertSubscription returned no row");
+  return row;
+}
+
+export async function findSubscription(
+  db: Db,
+  userId: string,
+): Promise<SubscriptionRow | undefined> {
+  const rows = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.userId, userId))
+    .limit(1);
+  return rows[0];
+}
+
+export async function addWatch(db: Db, userId: string, programId: string): Promise<void> {
+  await db.insert(watches).values({ userId, programId }).onConflictDoNothing();
+}
+
+export async function removeWatch(
+  db: Db,
+  userId: string,
+  programId: string,
+): Promise<void> {
+  await db
+    .delete(watches)
+    .where(and(eq(watches.userId, userId), eq(watches.programId, programId)));
+}
+
+export async function findWatchProgramIds(db: Db, userId: string): Promise<string[]> {
+  const rows = await db
+    .select({ programId: watches.programId })
+    .from(watches)
+    .where(eq(watches.userId, userId));
+  return rows.map((r) => r.programId);
+}
+
+export interface WatchedProgram {
+  programId: string;
+  name: string;
+  externalId: string;
+}
+
+export async function listWatches(db: Db, userId: string): Promise<WatchedProgram[]> {
+  return db
+    .select({
+      programId: programs.id,
+      name: programs.name,
+      externalId: programs.externalId,
+    })
+    .from(watches)
+    .innerJoin(programs, eq(watches.programId, programs.id))
+    .where(eq(watches.userId, userId))
+    .orderBy(programs.name);
+}
+
+// --- Milestone 2: notification deliveries ---
+
+export interface ChangeWithProgram {
+  id: string;
+  type: string;
+  programId: string;
+  programName: string;
+  assetId: string | null;
+  assetKey: string | null;
+  assetIdentifier: string | null;
+  collectionRunId: string;
+  detectedAt: Date;
+}
+
+/** Load a run's changes once (enqueue fans out per user in memory). */
+export async function findChangesByRun(
+  db: Db,
+  runId: string,
+): Promise<ChangeWithProgram[]> {
+  return db
+    .select({
+      id: changes.id,
+      type: changes.type,
+      programId: changes.programId,
+      programName: programs.name,
+      assetId: changes.assetId,
+      assetKey: changes.assetKey,
+      assetIdentifier: changes.assetIdentifier,
+      collectionRunId: changes.collectionRunId,
+      detectedAt: changes.detectedAt,
+    })
+    .from(changes)
+    .innerJoin(programs, eq(changes.programId, programs.id))
+    .where(eq(changes.collectionRunId, runId))
+    .orderBy(programs.name, changes.detectedAt);
+}
+
+/** Load a digest window's changes once (same shape as findChangesByRun). */
+export async function findChangesInWindow(
+  db: Db,
+  windowStart: Date,
+  windowEnd: Date,
+): Promise<ChangeWithProgram[]> {
+  return db
+    .select({
+      id: changes.id,
+      type: changes.type,
+      programId: changes.programId,
+      programName: programs.name,
+      assetId: changes.assetId,
+      assetKey: changes.assetKey,
+      assetIdentifier: changes.assetIdentifier,
+      collectionRunId: changes.collectionRunId,
+      detectedAt: changes.detectedAt,
+    })
+    .from(changes)
+    .innerJoin(programs, eq(changes.programId, programs.id))
+    .where(and(gte(changes.detectedAt, windowStart), lt(changes.detectedAt, windowEnd)))
+    .orderBy(programs.name, changes.detectedAt);
+}
+
+export interface EligibleUser {
+  userId: string;
+  email: string;
+  frequency: string;
+  watchNewPrograms: boolean;
+  watchAllPrograms: boolean;
+}
+
+/** Verified, subscribed, not globally unsubscribed — for one cadence. */
+export async function findEligibleUsers(
+  db: Db,
+  frequency: "immediate" | "daily",
+): Promise<EligibleUser[]> {
+  return db
+    .select({
+      userId: users.id,
+      email: users.email,
+      frequency: subscriptions.frequency,
+      watchNewPrograms: subscriptions.watchNewPrograms,
+      watchAllPrograms: subscriptions.watchAllPrograms,
+    })
+    .from(users)
+    .innerJoin(subscriptions, eq(subscriptions.userId, users.id))
+    .where(
+      and(
+        eq(subscriptions.frequency, frequency),
+        isNull(users.unsubscribedAt),
+        isNotNull(users.emailVerifiedAt),
+      ),
+    );
+}
+
+/** Recent completed runs that produced changes (catch-up source). */
+export async function findRunsWithChangesSince(
+  db: Db,
+  since: Date,
+): Promise<{ id: string }[]> {
+  return db
+    .select({ id: collectionRuns.id })
+    .from(collectionRuns)
+    .where(
+      and(
+        eq(collectionRuns.status, "completed"),
+        gte(collectionRuns.completedAt, since),
+        sql`(${collectionRuns.programsAdded} + ${collectionRuns.assetsAdded} + ${collectionRuns.assetsRemoved}) > 0`,
+      ),
+    )
+    .orderBy(collectionRuns.completedAt);
+}
+
+/**
+ * Idempotent enqueue: second call for the same (user, run) inserts nothing.
+ * Partial-unique inference (target + where) — verified by Phase 0 spike.
+ */
+export async function enqueueImmediateDelivery(
+  db: Db,
+  userId: string,
+  runId: string,
+): Promise<boolean> {
+  const rows = await db
+    .insert(notificationDeliveries)
+    .values({ userId, collectionRunId: runId, channel: "email", kind: "immediate" })
+    .onConflictDoNothing({
+      target: [
+        notificationDeliveries.userId,
+        notificationDeliveries.collectionRunId,
+        notificationDeliveries.channel,
+      ],
+      where: sql`${notificationDeliveries.kind} = 'immediate'`,
+    })
+    .returning({ id: notificationDeliveries.id });
+  return rows.length > 0;
+}
+
+export async function enqueueDailyDelivery(
+  db: Db,
+  userId: string,
+  digestOn: string,
+): Promise<boolean> {
+  const rows = await db
+    .insert(notificationDeliveries)
+    .values({ userId, digestOn, channel: "email", kind: "daily" })
+    .onConflictDoNothing({
+      target: [
+        notificationDeliveries.userId,
+        notificationDeliveries.digestOn,
+        notificationDeliveries.channel,
+      ],
+      where: sql`${notificationDeliveries.kind} = 'daily'`,
+    })
+    .returning({ id: notificationDeliveries.id });
+  return rows.length > 0;
+}
+
+/**
+ * Stale recovery (process crash only — the drain mutex means a live
+ * process never leaves `sending` rows for 10 minutes). Decrement attempts
+ * because the claimed attempt never ran; a crash loop still caps at 3.
+ */
+export async function resetStaleSending(db: Db, staleMs: number): Promise<number> {
+  const cutoff = new Date(Date.now() - staleMs);
+  const rows = await db
+    .update(notificationDeliveries)
+    .set({
+      status: "pending",
+      attempts: sql`GREATEST(${notificationDeliveries.attempts} - 1, 0)`,
+      nextAttemptAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(notificationDeliveries.status, "sending"),
+        lt(notificationDeliveries.updatedAt, cutoff),
+      ),
+    )
+    .returning({ id: notificationDeliveries.id });
+  return rows.length;
+}
+
+/**
+ * Atomically claim up to `limit` pending rows. Single statement:
+ * concurrent workers never double-claim (FOR UPDATE SKIP LOCKED).
+ */
+export async function claimDeliveries(db: Db, limit: number): Promise<DeliveryRow[]> {
+  const result = await db.execute<DeliveryRow>(sql`
+    WITH claimed AS (
+      SELECT id FROM notification_deliveries
+      WHERE status = 'pending'
+        AND attempts < 3
+        AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+      ORDER BY created_at
+      FOR UPDATE SKIP LOCKED
+      LIMIT ${limit}
+    )
+    UPDATE notification_deliveries d
+    SET status = 'sending',
+        attempts = d.attempts + 1,
+        next_attempt_at = NULL,
+        updated_at = now()
+    FROM claimed
+    WHERE d.id = claimed.id
+    RETURNING d.*`);
+  return (result.rows as Record<string, unknown>[]).map(mapDeliveryRow);
+}
+
+function mapDeliveryRow(r: Record<string, unknown>): DeliveryRow {
+  return {
+    id: r["id"] as string,
+    userId: r["user_id"] as string,
+    channel: r["channel"] as string,
+    kind: r["kind"] as string,
+    collectionRunId: r["collection_run_id"] as string | null,
+    digestOn: r["digest_on"] as string | null,
+    status: r["status"] as string,
+    attempts: r["attempts"] as number,
+    nextAttemptAt: r["next_attempt_at"] as Date | null,
+    lastError: r["last_error"] as string | null,
+    sentAt: r["sent_at"] as Date | null,
+    createdAt: r["created_at"] as Date,
+    updatedAt: r["updated_at"] as Date,
+  };
+}
+
+export async function markDeliverySent(db: Db, id: string): Promise<void> {
+  await db
+    .update(notificationDeliveries)
+    .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
+    .where(eq(notificationDeliveries.id, id));
+}
+
+/** No mail by design (unverified/unsubscribed/empty re-filter). Not a failure. */
+export async function markDeliverySkipped(db: Db, id: string): Promise<void> {
+  await db
+    .update(notificationDeliveries)
+    .set({ status: "skipped", updatedAt: new Date() })
+    .where(eq(notificationDeliveries.id, id));
+}
+
+export async function markDeliveryFailed(
+  db: Db,
+  id: string,
+  lastError: string,
+): Promise<void> {
+  await db
+    .update(notificationDeliveries)
+    .set({ status: "failed", lastError, updatedAt: new Date() })
+    .where(eq(notificationDeliveries.id, id));
+}
+
+export async function retryDeliveryLater(
+  db: Db,
+  id: string,
+  attempts: number,
+  lastError: string,
+): Promise<void> {
+  const delayMs = attempts * attempts * 60_000;
+  await db
+    .update(notificationDeliveries)
+    .set({
+      status: "pending",
+      nextAttemptAt: new Date(Date.now() + delayMs),
+      lastError,
+      updatedAt: new Date(),
+    })
+    .where(eq(notificationDeliveries.id, id));
 }

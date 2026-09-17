@@ -6,7 +6,10 @@ export type ErrorCode =
   | "AUTH_FAILED"
   | "RATE_LIMITED"
   | "NETWORK"
-  | "TIMEOUT";
+  | "TIMEOUT"
+  | "UNAUTHORIZED"
+  | "INVALID_TOKEN"
+  | "EMAIL_RATE_LIMITED";
 
 export class AppError extends Error {
   readonly code: ErrorCode;
@@ -30,6 +33,18 @@ export class AppError extends Error {
   static internal(): AppError {
     return new AppError("INTERNAL", "Internal server error", 500);
   }
+
+  static unauthorized(message = "Unauthorized"): AppError {
+    return new AppError("UNAUTHORIZED", message, 401);
+  }
+
+  static invalidToken(message = "Invalid or expired token"): AppError {
+    return new AppError("INVALID_TOKEN", message, 401);
+  }
+
+  static emailRateLimited(message = "Too many requests"): AppError {
+    return new AppError("EMAIL_RATE_LIMITED", message, 429);
+  }
 }
 
 const STATUS_BY_CODE: Record<ErrorCode, number> = {
@@ -41,6 +56,9 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   RATE_LIMITED: 502,
   NETWORK: 502,
   TIMEOUT: 504,
+  UNAUTHORIZED: 401,
+  INVALID_TOKEN: 401,
+  EMAIL_RATE_LIMITED: 429,
 };
 
 export function statusFor(code: ErrorCode): number {
