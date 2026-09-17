@@ -144,25 +144,15 @@ Configure the required API credentials and database connection.
 
 ## API
 
-Health check:
+All endpoints are read-only. Full reference with curl examples in [`docs/api.md`](docs/api.md).
 
-    GET /health
-
-Programs:
-
-    GET /api/v1/programs
-
-Program:
-
-    GET /api/v1/programs/:id
-
-Program assets:
-
-    GET /api/v1/programs/:id/assets
-
-Program changes:
-
-    GET /api/v1/programs/:id/changes
+| Endpoint                           | Description                           |
+| ---------------------------------- | ------------------------------------- |
+| `GET /health`                      | Health check                          |
+| `GET /api/v1/programs`             | List programs                         |
+| `GET /api/v1/programs/:id`         | Get program by UUID                   |
+| `GET /api/v1/programs/:id/assets`  | List program assets (filter by scope) |
+| `GET /api/v1/programs/:id/changes` | List detected changes                 |
 
 ## Change Types
 
@@ -196,6 +186,7 @@ Technical documentation is available in:
 
 See:
 
+- [`docs/api.md`](docs/api.md)
 - `docs/architecture.md`
 - `docs/collector.md`
 - `docs/database.md`
