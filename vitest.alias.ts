@@ -6,4 +6,5 @@ export const workspaceAliases: Record<string, string> = {
   "@anveshan/domain": root("./packages/domain/src/index.ts"),
   "@anveshan/database": root("./packages/database/src/index.ts"),
   "@anveshan/collector": root("./packages/collector/src/index.ts"),
+  "@anveshan/notifications": root("./packages/notifications/src/index.ts"),
 };

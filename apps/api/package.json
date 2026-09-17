@@ -16,6 +16,7 @@
     "@anveshan/config": "workspace:*",
     "@anveshan/database": "workspace:*",
     "@anveshan/domain": "workspace:*",
+    "@anveshan/notifications": "workspace:*",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "node-cron": "^3.0.3",

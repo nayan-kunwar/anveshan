@@ -21,7 +21,8 @@
       "@anveshan/config": ["./packages/config/src/index.ts"],
       "@anveshan/domain": ["./packages/domain/src/index.ts"],
       "@anveshan/database": ["./packages/database/src/index.ts"],
-      "@anveshan/collector": ["./packages/collector/src/index.ts"]
+      "@anveshan/collector": ["./packages/collector/src/index.ts"],
+      "@anveshan/notifications": ["./packages/notifications/src/index.ts"]
     }
   }
 }

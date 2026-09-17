@@ -30,3 +30,24 @@ export const changesQuerySchema = z.object({
 });
 
 export type ChangesQuery = z.infer<typeof changesQuerySchema>;
+
+// --- Milestone 2: auth ---
+
+export const requestMagicLinkSchema = z.object({
+  email: z.string().email("Email must be valid").max(320),
+});
+
+export type RequestMagicLinkBody = z.infer<typeof requestMagicLinkSchema>;
+
+export const verifyMagicLinkSchema = z.object({
+  token: z.string().min(1, "Token is required").max(256),
+});
+
+export type VerifyMagicLinkBody = z.infer<typeof verifyMagicLinkSchema>;
+
+export const unsubscribeSchema = z.object({
+  userId: z.string().uuid("userId must be a UUID"),
+  token: z.string().min(1, "Token is required").max(256),
+});
+
+export type UnsubscribeBody = z.infer<typeof unsubscribeSchema>;
