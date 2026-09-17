@@ -51,3 +51,23 @@ export const unsubscribeSchema = z.object({
 });
 
 export type UnsubscribeBody = z.infer<typeof unsubscribeSchema>;
+
+// --- Milestone 2: subscriptions ---
+
+export const subscriptionBodySchema = z.object({
+  frequency: z.enum(["immediate", "daily"]),
+  watchNewPrograms: z.boolean(),
+  watchAllPrograms: z.boolean(),
+});
+
+export type SubscriptionBody = z.infer<typeof subscriptionBodySchema>;
+
+export const watchBodySchema = z.object({
+  programId: z.string().uuid("programId must be a UUID"),
+});
+
+export type WatchBody = z.infer<typeof watchBodySchema>;
+
+export const watchParamSchema = z.object({
+  programId: z.string().uuid("programId must be a UUID"),
+});

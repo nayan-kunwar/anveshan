@@ -7,6 +7,7 @@ import type { Logger } from "pino";
 import { createRequireSession } from "./auth/middleware.js";
 import { createEmailRateLimiter, createIpRateLimiter } from "./auth/rate-limit.js";
 import { createAuthRoutes } from "./auth/routes.js";
+import { createSubscriptionRoutes } from "./subscriptions/routes.js";
 import { createProgramController } from "./controllers/programs.js";
 import { asyncRoute, errorHandler, notFoundHandler } from "./middleware.js";
 import type { ProgramStore } from "./services/programs.js";
@@ -62,6 +63,33 @@ export function createApp(deps: AppDeps): express.Express {
     app.get("/api/v1/auth/me", requireSessionHandler, asyncRoute(auth.me));
     app.post("/api/v1/auth/logout", requireSessionHandler, asyncRoute(auth.logout));
     app.post("/api/v1/unsubscribe", asyncRoute(auth.unsubscribe));
+
+    const subscriptions = createSubscriptionRoutes({ db: deps.db });
+    app.get(
+      "/api/v1/subscriptions",
+      requireSessionHandler,
+      asyncRoute(subscriptions.getSubscription),
+    );
+    app.put(
+      "/api/v1/subscriptions",
+      requireSessionHandler,
+      asyncRoute(subscriptions.putSubscription),
+    );
+    app.get(
+      "/api/v1/subscriptions/watches",
+      requireSessionHandler,
+      asyncRoute(subscriptions.listWatches),
+    );
+    app.post(
+      "/api/v1/subscriptions/watches",
+      requireSessionHandler,
+      asyncRoute(subscriptions.addWatch),
+    );
+    app.delete(
+      "/api/v1/subscriptions/watches/:programId",
+      requireSessionHandler,
+      asyncRoute(subscriptions.removeWatch),
+    );
   }
 
   app.use(notFoundHandler);
