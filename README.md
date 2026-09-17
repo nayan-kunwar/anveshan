@@ -142,6 +142,99 @@ Configure the required API credentials and database connection.
 
     pnpm test
 
+## Production
+
+In production, one process runs everything: Express API + cron scheduler + HackerOne collector. No separate worker needed.
+
+### How it works
+
+    ┌──────────────────────────────────────────────────┐
+    │              node apps/api/dist/index.js           │
+    │                                                    │
+    │  Express API (port 3000)                           │
+    │    ├── GET /health                                 │
+    │    ├── GET /api/v1/programs                        │
+    │    ├── GET /api/v1/programs/:id                    │
+    │    ├── GET /api/v1/programs/:id/assets             │
+    │    └── GET /api/v1/programs/:id/changes            │
+    │                                                    │
+    │  node-cron scheduler                               │
+    │    └── every 30 min → runCollection()              │
+    │         ├── fetch from HackerOne API               │
+    │         ├── diff against previous state            │
+    │         └── persist programs, assets, changes      │
+    └──────────────────────────────────────────────────┘
+
+### Deploy with Docker
+
+    # 1. Create .env with real credentials
+    cp .env.example .env
+
+    # 2. Build and start
+    docker compose --profile api up -d --build
+
+This starts two containers:
+
+- `anveshan-postgres` — Postgres 16 (persistent volume `pgdata`)
+- `anveshan-api` — your app (built from `apps/api/Dockerfile`)
+
+### Deploy without Docker (bare metal / VPS)
+
+    # 1. Install dependencies
+    pnpm install
+
+    # 2. Set up database
+    docker compose up -d postgres
+    sleep 5
+    pnpm db:migrate
+
+    # 3. Build
+    pnpm build
+
+    # 4. Start
+    node apps/api/dist/index.js
+
+### Environment variables
+
+| Variable              | Required | Default        | Description                           |
+| --------------------- | -------- | -------------- | ------------------------------------- |
+| `DATABASE_URL`        | Yes      | —              | Postgres connection string            |
+| `HACKERONE_USERNAME`  | Yes      | —              | HackerOne API username                |
+| `HACKERONE_API_TOKEN` | Yes      | —              | HackerOne API token                   |
+| `COLLECTION_CRON`     | No       | `*/30 * * * *` | Collection schedule (cron expression) |
+| `COLLECTION_TZ`       | No       | `UTC`          | Timezone for cron schedule            |
+| `COLLECTION_ENABLED`  | No       | `true`         | Enable/disable scheduler              |
+| `PORT`                | No       | `3000`         | API listen port                       |
+| `LOG_LEVEL`           | No       | `info`         | Pino log level                        |
+
+### Manual collection
+
+To run a one-off collection (same logic as the scheduler):
+
+    pnpm collect
+
+### What happens on startup
+
+1. Loads env from root `.env`
+2. Connects to Postgres, runs migrations
+3. Starts cron scheduler (if `COLLECTION_ENABLED=true`)
+4. Starts Express API on configured port
+5. Every 30 minutes: fetch programs → fetch scopes → diff → persist
+6. On SIGTERM/SIGINT: stops API, closes DB pool, exits cleanly
+
+### Collection schedule
+
+The default cron `*/30 * * * *` runs every 30 minutes. Each full collection takes ~15-20 minutes (rate-limited by HackerOne API). Overlap is prevented by a Postgres session advisory lock — if a run is still going, the next scheduled run skips.
+
+### Graceful shutdown
+
+The process handles `SIGINT` and `SIGTERM`:
+
+1. Stops accepting new HTTP requests
+2. Waits for in-flight requests to complete
+3. Closes the database pool
+4. Exits
+
 ## API
 
 All endpoints are read-only. Full reference with curl examples in [`docs/api.md`](docs/api.md).
