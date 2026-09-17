@@ -6,7 +6,7 @@ import type { ZodType } from "zod";
 export type FetchFn = typeof fetch;
 
 export interface HackerOneLogger {
-  warn(message: string, ...args: unknown[]): void;
+  warn(message: string, context?: Record<string, unknown>): void;
 }
 
 const noopLogger: HackerOneLogger = { warn: () => undefined };

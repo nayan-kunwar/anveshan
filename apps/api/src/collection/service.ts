@@ -287,10 +287,10 @@ function createRealCollector(config: AppConfig, runLogger: Logger): ProgramColle
     apiToken: creds.apiToken,
     timeoutMs: config.H1_TIMEOUT_MS,
     minDelayMs: config.H1_MIN_DELAY_MS,
-    logger: { warn: (message: string) => runLogger.warn(message) },
+    logger: { warn: (message, context) => runLogger.warn(context ?? {}, message) },
   });
   return new HackerOneCollector(client, {
-    warn: (message: string) => runLogger.warn(message),
+    warn: (message, context) => runLogger.warn(context ?? {}, message),
   });
 }
 

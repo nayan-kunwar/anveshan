@@ -27,7 +27,7 @@ export class HackerOneCollector implements ProgramCollector {
 
   constructor(client: HackerOneClient, logger?: HackerOneLogger) {
     this.client = client;
-    this.logger = logger ? { warn: (m) => logger.warn(m) } : noopLogger;
+    this.logger = logger ?? noopLogger;
   }
 
   async getPrograms(): Promise<CollectedProgram[]> {
