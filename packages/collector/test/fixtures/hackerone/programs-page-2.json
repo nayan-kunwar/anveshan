@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "id": "1003",
+      "type": "program",
+      "attributes": {
+        "handle": "initech",
+        "name": "Initech",
+        "currency": "usd",
+        "url": "https://hackerone.com/initech"
+      }
+    }
+  ],
+  "links": {
+    "self": "https://api.hackerone.com/v1/hackers/programs?page%5Bnumber%5D=2&page%5Bsize%5D=100",
+    "last": "https://api.hackerone.com/v1/hackers/programs?page%5Bnumber%5D=2&page%5Bsize%5D=100"
+  }
+}

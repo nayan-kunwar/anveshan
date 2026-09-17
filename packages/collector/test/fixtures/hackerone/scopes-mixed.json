@@ -1,0 +1,70 @@
+{
+  "data": [
+    {
+      "id": "5001",
+      "type": "structured-scope",
+      "attributes": {
+        "asset_identifier": "https://Example.COM:443/app/",
+        "asset_type": "URL",
+        "eligible_for_bounty": true,
+        "eligible_for_submission": true,
+        "max_severity": "critical",
+        "created_at": "2024-01-10T00:00:00.000Z",
+        "updated_at": "2024-06-10T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "5002",
+      "type": "structured-scope",
+      "attributes": {
+        "asset_identifier": "*.example.com",
+        "asset_type": "WILDCARD",
+        "eligible_for_bounty": true,
+        "eligible_for_submission": true,
+        "max_severity": "high",
+        "created_at": "2024-01-10T00:00:00.000Z",
+        "updated_at": "2024-06-10T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "5003",
+      "type": "structured-scope",
+      "attributes": {
+        "asset_identifier": "10.0.0.0/24",
+        "asset_type": "CIDR",
+        "eligible_for_bounty": true,
+        "eligible_for_submission": true,
+        "max_severity": "medium",
+        "created_at": "2024-02-01T00:00:00.000Z",
+        "updated_at": "2024-06-11T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "5004",
+      "type": "structured-scope",
+      "attributes": {
+        "asset_identifier": "staging.example.com",
+        "asset_type": "DOMAIN",
+        "eligible_for_bounty": false,
+        "eligible_for_submission": true,
+        "max_severity": "none",
+        "created_at": "2024-03-01T00:00:00.000Z",
+        "updated_at": "2024-06-12T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "5005",
+      "type": "structured-scope",
+      "attributes": {
+        "asset_identifier": "Internal Tool v2",
+        "asset_type": "OTHER",
+        "eligible_for_bounty": false,
+        "eligible_for_submission": false,
+        "max_severity": "none",
+        "created_at": "2024-04-01T00:00:00.000Z",
+        "updated_at": "2024-06-12T00:00:00.000Z"
+      }
+    }
+  ],
+  "links": {}
+}

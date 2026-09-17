@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "id": "1001",
+      "type": "program",
+      "attributes": {
+        "handle": "acme",
+        "name": "Acme Corp",
+        "currency": "usd",
+        "url": "https://hackerone.com/acme"
+      }
+    },
+    {
+      "id": "1002",
+      "type": "program",
+      "attributes": {
+        "handle": "globex",
+        "name": "Globex",
+        "currency": "usd",
+        "url": "https://hackerone.com/globex"
+      }
+    }
+  ],
+  "links": {
+    "self": "https://api.hackerone.com/v1/hackers/programs?page%5Bnumber%5D=1&page%5Bsize%5D=100",
+    "next": "https://api.hackerone.com/v1/hackers/programs?page%5Bnumber%5D=2&page%5Bsize%5D=100",
+    "last": "https://api.hackerone.com/v1/hackers/programs?page%5Bnumber%5D=2&page%5Bsize%5D=100"
+  }
+}
