@@ -37,6 +37,26 @@ export const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   LOG_LEVEL: logLevelSchema.default("info"),
   H1_LIVE_TEST: z.string().optional(),
+  // --- Milestone 2: notifications + magic-link auth ---
+  // SMTP is optional at boot (Gmail is local-only; production uses
+  // Resend/Postmark/SES). Auth secrets are optional at boot and
+  // fail-closed per endpoint via requireMagicLinkSecrets() etc.
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASS: z.string().min(1).optional(),
+  SMTP_FROM: z.string().email().optional(),
+  MAGIC_LINK_SECRET: z.string().min(16).optional(),
+  MAGIC_LINK_EXPIRY: z.coerce.number().int().positive().default(900000),
+  SESSION_SECRET: z.string().min(16).optional(),
+  SESSION_EXPIRY: z.coerce.number().int().positive().default(2592000000),
+  UNSUBSCRIBE_SECRET: z.string().min(16).optional(),
+  FRONTEND_URL: z.string().url().default("http://localhost:3001"),
+  NOTIFICATIONS_ENABLED: booleanFromString.default(false),
+  AUTH_EMAIL_ENABLED: booleanFromString.optional(),
+  DAILY_DIGEST_CRON: z.string().min(1).default("0 8 * * *"),
+  IMMEDIATE_EMAIL_CAP: z.coerce.number().int().positive().default(20),
+  ASSET_EMAIL_CAP: z.coerce.number().int().positive().default(10),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
@@ -84,7 +104,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   // without credentials; collection still fails closed via
   // requireHackerOneCredentials().
   const cleaned: Record<string, string | undefined> = { ...env };
-  for (const key of ["HACKERONE_USERNAME", "HACKERONE_API_TOKEN"] as const) {
+  for (const key of [
+    "HACKERONE_USERNAME",
+    "HACKERONE_API_TOKEN",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_USER",
+    "SMTP_PASS",
+    "SMTP_FROM",
+    "MAGIC_LINK_SECRET",
+    "SESSION_SECRET",
+    "UNSUBSCRIBE_SECRET",
+    "AUTH_EMAIL_ENABLED",
+    "FRONTEND_URL",
+  ] as const) {
     if (cleaned[key] === "") cleaned[key] = undefined;
   }
   const parsed = envSchema.safeParse(cleaned);
@@ -113,4 +146,44 @@ export function requireHackerOneCredentials(config: AppConfig): HackerOneCredent
     username: config.HACKERONE_USERNAME,
     apiToken: config.HACKERONE_API_TOKEN,
   };
+}
+
+export interface MagicLinkSecrets {
+  magicLinkSecret: string;
+  sessionSecret: string;
+}
+
+/**
+ * Fail-closed: request-magic-link and verify must call this first.
+ * Secrets stay optional at boot so read-only commands work without them.
+ */
+export function requireMagicLinkSecrets(config: AppConfig): MagicLinkSecrets {
+  const missing: string[] = [];
+  if (!config.MAGIC_LINK_SECRET) missing.push("MAGIC_LINK_SECRET");
+  if (!config.SESSION_SECRET) missing.push("SESSION_SECRET");
+  if (missing.length > 0) {
+    throw new Error(`Missing auth secrets: ${missing.join(", ")}`);
+  }
+  return {
+    magicLinkSecret: config.MAGIC_LINK_SECRET as string,
+    sessionSecret: config.SESSION_SECRET as string,
+  };
+}
+
+/** Fail-closed: unsubscribe must call this first (UNSUBSCRIBE_SECRET only). */
+export function requireUnsubscribeSecret(config: AppConfig): string {
+  if (!config.UNSUBSCRIBE_SECRET) {
+    throw new Error("Missing auth secrets: UNSUBSCRIBE_SECRET");
+  }
+  return config.UNSUBSCRIBE_SECRET;
+}
+
+/**
+ * Magic-link send gate. Explicit AUTH_EMAIL_ENABLED wins; otherwise
+ * derived (true only when SMTP_HOST + SMTP_USER + SMTP_PASS are set).
+ * Independent of NOTIFICATIONS_ENABLED.
+ */
+export function isAuthEmailEnabled(config: AppConfig): boolean {
+  if (config.AUTH_EMAIL_ENABLED !== undefined) return config.AUTH_EMAIL_ENABLED;
+  return Boolean(config.SMTP_HOST && config.SMTP_USER && config.SMTP_PASS);
 }

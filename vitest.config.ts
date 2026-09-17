@@ -21,6 +21,8 @@ export default defineConfig({
     },
     env: {
       COLLECTION_ENABLED: "false",
+      NOTIFICATIONS_ENABLED: "false",
+      AUTH_EMAIL_ENABLED: "false",
     },
   },
 });

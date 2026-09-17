@@ -3,7 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { initLocalEnv, loadConfig, requireHackerOneCredentials } from "../src/index.js";
+import {
+  initLocalEnv,
+  isAuthEmailEnabled,
+  loadConfig,
+  requireHackerOneCredentials,
+  requireMagicLinkSecrets,
+  requireUnsubscribeSecret,
+} from "../src/index.js";
 
 const baseEnv = {
   DATABASE_URL: "postgres://anveshan:anveshan@localhost:5432/anveshan",
@@ -57,6 +64,85 @@ describe("loadConfig", () => {
       username: "user",
       apiToken: "token",
     });
+  });
+
+  it("applies notification defaults", () => {
+    const config = loadConfig({ ...baseEnv });
+    expect(config.NOTIFICATIONS_ENABLED).toBe(false);
+    expect(config.AUTH_EMAIL_ENABLED).toBeUndefined();
+    expect(config.DAILY_DIGEST_CRON).toBe("0 8 * * *");
+    expect(config.IMMEDIATE_EMAIL_CAP).toBe(20);
+    expect(config.ASSET_EMAIL_CAP).toBe(10);
+    expect(config.FRONTEND_URL).toBe("http://localhost:3001");
+    expect(config.MAGIC_LINK_EXPIRY).toBe(900000);
+    expect(config.SESSION_EXPIRY).toBe(2592000000);
+  });
+
+  it("treats blank SMTP and secret values as unset", () => {
+    const config = loadConfig({
+      ...baseEnv,
+      SMTP_HOST: "",
+      SMTP_USER: "",
+      SMTP_PASS: "",
+      MAGIC_LINK_SECRET: "",
+      SESSION_SECRET: "",
+      UNSUBSCRIBE_SECRET: "",
+      AUTH_EMAIL_ENABLED: "",
+    });
+    expect(config.SMTP_HOST).toBeUndefined();
+    expect(config.MAGIC_LINK_SECRET).toBeUndefined();
+    expect(config.AUTH_EMAIL_ENABLED).toBeUndefined();
+  });
+
+  it("derives AUTH_EMAIL_ENABLED from SMTP vars when unset", () => {
+    expect(isAuthEmailEnabled(loadConfig({ ...baseEnv }))).toBe(false);
+    expect(
+      isAuthEmailEnabled(
+        loadConfig({
+          ...baseEnv,
+          SMTP_HOST: "smtp.example.com",
+          SMTP_USER: "u",
+          SMTP_PASS: "p",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("explicit AUTH_EMAIL_ENABLED wins over derivation", () => {
+    expect(
+      isAuthEmailEnabled(
+        loadConfig({
+          ...baseEnv,
+          AUTH_EMAIL_ENABLED: "false",
+          SMTP_HOST: "smtp.example.com",
+          SMTP_USER: "u",
+          SMTP_PASS: "p",
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      isAuthEmailEnabled(loadConfig({ ...baseEnv, AUTH_EMAIL_ENABLED: "true" })),
+    ).toBe(true);
+  });
+
+  it("requireMagicLinkSecrets fails closed when secrets are missing", () => {
+    const config = loadConfig({ ...baseEnv });
+    expect(() => requireMagicLinkSecrets(config)).toThrow(/MAGIC_LINK_SECRET/);
+    expect(() => requireUnsubscribeSecret(config)).toThrow(/UNSUBSCRIBE_SECRET/);
+  });
+
+  it("requireMagicLinkSecrets returns secrets when present", () => {
+    const config = loadConfig({
+      ...baseEnv,
+      MAGIC_LINK_SECRET: "a".repeat(32),
+      SESSION_SECRET: "b".repeat(32),
+      UNSUBSCRIBE_SECRET: "c".repeat(32),
+    });
+    expect(requireMagicLinkSecrets(config)).toEqual({
+      magicLinkSecret: "a".repeat(32),
+      sessionSecret: "b".repeat(32),
+    });
+    expect(requireUnsubscribeSecret(config)).toBe("c".repeat(32));
   });
 });
 
