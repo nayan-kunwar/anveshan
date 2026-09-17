@@ -10,21 +10,22 @@ The system collects program and scope information from authorized bug-bounty pla
 
 # 1. Current Milestone
 
-The current milestone is the first working MVP.
+The collector MVP (Milestone 1) is complete: real HackerOne collection,
+diff, persist, read-only API.
 
-The MVP supports ONLY:
+The current milestone is Milestone 2: email notifications.
 
-- PROGRAM_ADDED
-- ASSET_ADDED
-- ASSET_REMOVED
+Milestone 2 adds (see `docs/notification-design.md`):
 
-The current collector type is ONLY:
+- magic-link authentication (no passwords)
+- subscriptions with per-program watches + immediate/daily cadence
+- outbox-based email delivery via generic SMTP (nodemailer)
+- minimal Next.js frontend (login, dashboard, unsubscribe)
 
-- HackerOne API Collector (`platform = "hackerone"`, HackerOne Hacker API v1)
-
-See `docs/decisions/005-hackerone.md`.
-
-The goal is to prove that Anveshan can collect real bug-bounty program and scope data from HackerOne and reliably detect changes between collection runs.
+Milestone 1 rules stay frozen: the collector, diff engine, change types
+(PROGRAM_ADDED, ASSET_ADDED, ASSET_REMOVED), and `runCollection()` core
+are unchanged. Notifications are a post-collection side effect only —
+SMTP never runs inside the collection lock.
 
 ---
 
@@ -36,12 +37,8 @@ Do NOT implement any of the following in the current milestone:
 - RSS collectors
 - Feed collectors
 - Webhook collectors
-- Email notifications
 - Discord notifications
 - Telegram notifications
-- User accounts
-- Authentication
-- Frontend/dashboard
 - Kafka
 - Redis
 - RabbitMQ
@@ -511,9 +508,10 @@ Implement:
 
 Full contract: `docs/openapi.yaml` (source of truth for shapes).
 
-These endpoints are read-only.
-
-No user authentication is required for the MVP.
+Milestone 1 endpoints above are read-only and need no authentication.
+Milestone 2 adds session-authenticated auth/subscription/watch
+endpoints plus a signed-token unsubscribe endpoint — see
+`docs/notification-design.md`. Program/asset/change reads stay public.
 
 ---
 
@@ -537,6 +535,11 @@ MVP error `code` enum (keep closed):
     PROGRAM_NOT_FOUND,
     BAD_REQUEST (Zod validation), INTERNAL,
     COLLECTION_FAILED, AUTH_FAILED, RATE_LIMITED, NETWORK, TIMEOUT
+
+Milestone 2 adds: `UNAUTHORIZED` (401, missing/invalid/expired
+session), `INVALID_TOKEN` (401, bad magic-link/unsubscribe token),
+`EMAIL_RATE_LIMITED` (429, magic-link throttling). `AUTH_FAILED`
+stays reserved for HackerOne credentials; never reuse it for sessions.
 
 Handle:
 
