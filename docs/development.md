@@ -24,6 +24,7 @@ Root `package.json` MUST expose:
 | Script                                          | Purpose                                                            |
 | ----------------------------------------------- | ------------------------------------------------------------------ |
 | `pnpm dev`                                      | run `apps/api` in watch mode                                       |
+| `pnpm dev:web`                                  | run `apps/web` (Next.js) in dev mode on :3001                      |
 | `pnpm build`                                    | `tsc -b` all workspaces                                            |
 | `pnpm typecheck`                                | `tsc --noEmit` all workspaces                                      |
 | `pnpm lint` / `pnpm format`                     | eslint / prettier check                                            |
@@ -72,6 +73,7 @@ over the file; tests ignore the file entirely (hermetic).
 
 - `postgres:16` (volume `pgdata`, healthcheck `pg_isready`)
 - `api` (optional in MVP, builds `apps/api`; must `depends_on: postgres`)
+- `web` (Milestone 2, builds `apps/web`; proxies `/api/*` to `api`)
 
 Local dev usually runs only `postgres` in Docker, `api` via `pnpm dev`.
 
@@ -79,7 +81,8 @@ Local dev usually runs only `postgres` in Docker, `api` via `pnpm dev`.
 
 - `pnpm test`: no network. Fixtures in
   `packages/collector/test/fixtures/hackerone/*.json`.
-  Sets `COLLECTION_ENABLED=false` so cron never fires.
+  Sets `COLLECTION_ENABLED=false` so cron never fires, plus
+  `NOTIFICATIONS_ENABLED=false` / `AUTH_EMAIL_ENABLED=false` so no SMTP.
 - `pnpm test:live`: requires `H1_LIVE_TEST=1` + real credentials.
   Flow: auth → fetch 1 programs page → fetch 1 program scopes →
   normalize → persist → re-run unchanged → assert 0 new changes.

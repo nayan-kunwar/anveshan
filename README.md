@@ -98,53 +98,18 @@ Web scraping, RSS, webhooks, and other collectors are planned for later mileston
       openapi.yaml
       decisions/
 
-## Requirements
+## Running locally
 
-You need:
+Full step-by-step guide: [`docs/running.md`](docs/running.md)
+(prerequisites, setup, API, frontend, sign-in, collector, tests, gotchas).
 
-- Node.js
-- pnpm
-- Docker
-- Docker Compose
-- HackerOne API credentials (`HACKERONE_USERNAME` + `HACKERONE_API_TOKEN`)
-
-## Installation
-
-Clone the repository and install dependencies:
+Quick start:
 
     pnpm install
-
-## Environment
-
-Copy:
-
-    .env.example
-
-to:
-
-    .env
-
-Configure the required API credentials and database connection.
-
-## Start PostgreSQL
-
+    cp .env.example .env
     docker compose up -d postgres
-
-## Run migrations
-
     pnpm db:migrate
-
-## Start API
-
-    pnpm dev
-
-## Run collector
-
-    pnpm collect
-
-## Run tests
-
-    pnpm test
+    pnpm dev        # API on :3000 (second terminal: pnpm dev:web for :3001)
 
 ## Production
 
@@ -294,6 +259,7 @@ Technical documentation is available in:
 See:
 
 - [`docs/api.md`](docs/api.md)
+- [`docs/running.md`](docs/running.md)
 - [`docs/notification-design.md`](docs/notification-design.md)
 - `docs/architecture.md`
 - `docs/collector.md`
