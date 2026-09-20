@@ -14,7 +14,7 @@ Conventional Commits:
 
 Rules (enforced by `commitlint.config.js`):
 
-- `type`: `feat` | `fix` | `docs` | `chore` | `refactor` | `test` (hard error)
+- `type`: `feat` | `fix` | `docs` | `chore` | `refactor` | `test` | `build` | `ci` (hard error)
 - `scope`: free-form, lowercase (warning only, never blocks).
   Suggested: `collector` | `domain` | `database` | `api` | `config` |
   `docs` | `repo` | `ci` | `spec` | `deps` | `infra`.
@@ -30,6 +30,8 @@ Examples:
     feat(collector): paginate HackerOne structured scopes
     fix(domain): treat OUT→IN as ASSET_ADDED
     test(collector): add H1 429 fixture and backoff test
+    build(api): exclude mail-test from prod dist
+    ci(repo): lint commit headers on push
 
 Bad (rejected by hook):
 

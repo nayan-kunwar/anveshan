@@ -2,7 +2,7 @@
 export default {
   extends: ["@commitlint/config-conventional"],
   rules: {
-    "type-enum": [2, "always", ["feat", "fix", "docs", "chore", "refactor", "test"]],
+    "type-enum": [2, "always", ["feat", "fix", "docs", "chore", "refactor", "test", "build", "ci"]],
     // Scopes are free-form (warn-only): the list below is a suggestion,
     // not a gate. Unknown scopes (spec, deps, infra, …) pass with a nudge.
     "scope-enum": [
