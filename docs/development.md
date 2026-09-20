@@ -77,6 +77,19 @@ over the file; tests ignore the file entirely (hermetic).
 
 Local dev usually runs only `postgres` in Docker, `api` via `pnpm dev`.
 
+## Instant mail test (dev only, no HackerOne)
+
+`pnpm mail:test -- --email you@yopmail.com --yes` sends one real test
+mail in ~10s: synthetic `zz-*` run + changes → `enqueueImmediate` /
+`enqueueDailyDigest` → direct worker `drain()` with real SMTP.
+Flags: `--handle`, `--types PROGRAM_ADDED,ASSET_ADDED,ASSET_REMOVED`,
+`--cadence immediate|daily` (must match the user's dashboard frequency),
+`--watch watch-all|specific`, `--negative` (expects 0 mails),
+`--count 1..30`, `--cleanup` (default on; run + sent delivery stay as
+audit). Without `--yes` it dry-runs. Daily/negative runs complete with
+zero counters so immediate catch-up skips them. Never use in production
+(script refuses `NODE_ENV=production`).
+
 ## Test split
 
 - `pnpm test`: no network. Fixtures in
