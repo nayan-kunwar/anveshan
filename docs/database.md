@@ -1,5 +1,10 @@
 # Database Design
 
+## Visualization
+
+- Live data: `pnpm db:studio` (Drizzle Studio at `https://local.drizzle.studio`).
+- Static ER diagram + DBeaver/psql instructions: see `er-diagram.md`.
+
 ## Database
 
 Anveshan uses:
