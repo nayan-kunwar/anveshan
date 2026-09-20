@@ -27,6 +27,13 @@ Milestone 1 rules stay frozen: the collector, diff engine, change types
 are unchanged. Notifications are a post-collection side effect only —
 SMTP never runs inside the collection lock.
 
+The current milestone is Milestone 3: frontend experience.
+
+Milestone 3 restyles the Next.js subscriber app (dark/light theme,
+sidebar dashboard, landing page) without changing API contracts,
+notification semantics, or the filter matrix. No new endpoints, no new
+tables, no new dependencies for styling.
+
 ---
 
 # 2. Explicitly Out of Scope

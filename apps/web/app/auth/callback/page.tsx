@@ -27,17 +27,17 @@ function CallbackInner(): ReactNode {
 
   if (error) {
     return (
-      <>
+      <div className="center">
         <h1>Sign-in failed</h1>
         <p className="error">{error}</p>
         <p className="small">Links expire after 15 minutes and work only once.</p>
-      </>
+      </div>
     );
   }
   return (
-    <>
+    <div className="center">
       <h1>Signing you in…</h1>
-    </>
+    </div>
   );
 }
 

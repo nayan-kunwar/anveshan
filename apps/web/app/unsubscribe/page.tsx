@@ -15,10 +15,10 @@ function UnsubscribeInner(): ReactNode {
 
   if (userIdParam === null || tokenParam === null) {
     return (
-      <>
+      <div className="center">
         <h1>Unsubscribe</h1>
         <p className="error">This unsubscribe link is incomplete.</p>
-      </>
+      </div>
     );
   }
   const userId: string = userIdParam;
@@ -39,15 +39,15 @@ function UnsubscribeInner(): ReactNode {
 
   if (done) {
     return (
-      <>
+      <div className="center">
         <h1>Unsubscribed</h1>
         <p>You will no longer receive change notifications. Sign in to re-subscribe.</p>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="center">
       <h1>Unsubscribe</h1>
       <p>Stop all Anveshan change notification emails for this account?</p>
       <p>
@@ -56,7 +56,7 @@ function UnsubscribeInner(): ReactNode {
         </button>
       </p>
       {error ? <p className="error">{error}</p> : null}
-    </>
+    </div>
   );
 }
 

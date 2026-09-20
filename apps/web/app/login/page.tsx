@@ -30,18 +30,18 @@ export default function LoginPage(): ReactNode {
 
   if (sent) {
     return (
-      <>
+      <div className="center">
         <h1>Check your inbox</h1>
         <p>
           A sign-in link is on its way to <strong>{email}</strong>. It expires in 15
           minutes.
         </p>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="center">
       <h1>Sign in</h1>
       <p className="small">Enter your email to receive a one-time sign-in link.</p>
       <form onSubmit={(event) => void onSubmit(event)}>
@@ -53,11 +53,11 @@ export default function LoginPage(): ReactNode {
           value={email}
           onChange={(event) => setEmail(event.currentTarget.value)}
         />
-        <button type="submit" disabled={busy}>
+        <button type="submit" className="primary" disabled={busy}>
           {busy ? "Sending…" : "Send sign-in link"}
         </button>
       </form>
       {error ? <p className="error">{error}</p> : null}
-    </>
+    </div>
   );
 }

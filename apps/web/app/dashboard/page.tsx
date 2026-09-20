@@ -15,6 +15,9 @@ import {
   removeWatch,
 } from "../lib/api";
 import type { Program, Subscription, User, WatchedProgram } from "../lib/api";
+import Sidebar from "../components/Sidebar";
+import StatCard from "../components/StatCard";
+import Topbar from "../components/Topbar";
 
 export default function DashboardPage(): ReactNode {
   const router = useRouter();
@@ -117,101 +120,143 @@ export default function DashboardPage(): ReactNode {
 
   if (!user) {
     return (
-      <>
+      <div className="center">
         <h1>Dashboard</h1>
         <p>Loading…</p>
         {error ? <p className="error">{error}</p> : null}
-      </>
+      </div>
     );
   }
 
+  const cadence =
+    sub === null ? "Off" : sub.frequency === "immediate" ? "Immediate" : "Daily";
+  const scope = watchAll
+    ? "All programs"
+    : watches.length > 0
+      ? `${watches.length} watched`
+      : "Nothing yet";
+
   return (
-    <>
-      <h1>Dashboard</h1>
-      <p className="small">
-        Signed in as <strong>{user.email}</strong> ·{" "}
-        <button type="button" onClick={() => void onLogout()}>
-          Sign out
-        </button>
-      </p>
+    <div className="shell">
+      <Sidebar email={user.email} onSignOut={() => void onLogout()} />
+      <div className="content">
+        <Topbar title="Dashboard" email={user.email} />
 
-      <h2>Notifications</h2>
-      <label>
-        Frequency
-        <select
-          value={frequency}
-          onChange={(event) => setFrequency(event.target.value as "immediate" | "daily")}
-        >
-          <option value="immediate">Immediate (after each collection)</option>
-          <option value="daily">Daily digest (08:00 UTC)</option>
-        </select>
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={watchNew}
-          onChange={(e) => setWatchNew(e.target.checked)}
-        />
-        Notify me of new programs
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={watchAll}
-          onChange={(e) => setWatchAll(e.target.checked)}
-        />
-        Watch all programs (asset changes)
-      </label>
-      <p>
-        <button type="button" disabled={busy} onClick={() => void onSave()}>
-          {busy ? "Saving…" : "Save"}
-        </button>{" "}
-        {saved ? <span>Saved.</span> : null}
-        {sub ? null : (
-          <span className="small">
-            {" "}
-            No subscription yet — save to start receiving mail.
-          </span>
-        )}
-      </p>
+        <div className="stats">
+          <StatCard
+            label="Watched programs"
+            value={String(watches.length)}
+            sub="in your watch list"
+          />
+          <StatCard
+            label="Programs tracked"
+            value={String(programs.length)}
+            sub="in the HackerOne catalog"
+          />
+          <StatCard label="Email cadence" value={cadence} sub="delivery frequency" />
+          <StatCard label="Watch scope" value={scope} sub="notification coverage" />
+        </div>
 
-      <h2>Watched programs ({watches.length})</h2>
-      {watches.length === 0 ? (
-        <p className="small">Nothing watched yet. Search below to add programs.</p>
-      ) : (
-        <ul>
-          {watches.map((w) => (
-            <li key={w.programId}>
-              {w.name} <span className="small">({w.externalId})</span>
-              <button type="button" onClick={() => void onRemoveWatch(w.programId)}>
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+        <div className="card">
+          <h2>Watch program scope</h2>
+          <p className="desc">
+            Search the catalog and watch programs. You get mail when watched scope
+            changes.
+          </p>
+          <input
+            type="text"
+            placeholder="Search programs…"
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+          />
+          {matches.length > 0 ? (
+            <ul className="clean">
+              {matches.map((p) => (
+                <li key={p.id}>
+                  <span>
+                    {p.name} <span className="small">({p.externalId})</span>
+                  </span>
+                  <button type="button" onClick={() => void onAddWatch(p.id)}>
+                    Watch
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
 
-      <h2>Add programs</h2>
-      <input
-        type="text"
-        placeholder="Search programs…"
-        value={query}
-        onChange={(event) => setQuery(event.currentTarget.value)}
-      />
-      {matches.length > 0 ? (
-        <ul>
-          {matches.map((p) => (
-            <li key={p.id}>
-              {p.name} <span className="small">({p.externalId})</span>
-              <button type="button" onClick={() => void onAddWatch(p.id)}>
-                Watch
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+        <div className="card">
+          <h2>Notifications</h2>
+          <p className="desc">How often Anveshan emails you about watched changes.</p>
+          <label className="row">
+            Frequency
+            <select
+              value={frequency}
+              onChange={(event) =>
+                setFrequency(event.target.value as "immediate" | "daily")
+              }
+            >
+              <option value="immediate">Immediate (after each collection)</option>
+              <option value="daily">Daily digest (08:00 UTC)</option>
+            </select>
+          </label>
+          <label className="row">
+            <input
+              type="checkbox"
+              checked={watchNew}
+              onChange={(e) => setWatchNew(e.target.checked)}
+            />
+            Notify me of new programs
+          </label>
+          <label className="row">
+            <input
+              type="checkbox"
+              checked={watchAll}
+              onChange={(e) => setWatchAll(e.target.checked)}
+            />
+            Watch all programs (asset changes)
+          </label>
+          <p>
+            <button
+              type="button"
+              className="primary"
+              disabled={busy}
+              onClick={() => void onSave()}
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>{" "}
+            {saved ? <span className="good">Saved.</span> : null}
+            {sub ? null : (
+              <span className="small">
+                {" "}
+                No subscription yet — save to start receiving mail.
+              </span>
+            )}
+          </p>
+        </div>
 
-      {error ? <p className="error">{error}</p> : null}
-    </>
+        <div className="card">
+          <h2>Watched programs ({watches.length})</h2>
+          {watches.length === 0 ? (
+            <p className="desc">Nothing watched yet. Search above to add programs.</p>
+          ) : (
+            <ul className="clean">
+              {watches.map((w) => (
+                <li key={w.programId}>
+                  <span>
+                    {w.name} <span className="small">({w.externalId})</span>
+                  </span>
+                  <button type="button" onClick={() => void onRemoveWatch(w.programId)}>
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {error ? <p className="error">{error}</p> : null}
+      </div>
+    </div>
   );
 }
