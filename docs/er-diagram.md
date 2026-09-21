@@ -129,6 +129,8 @@ erDiagram
         text frequency "immediate|daily"
         boolean watch_new_programs
         boolean watch_all_programs
+        text digest_timezone "IANA, default UTC"
+        time digest_time_local "HH:MM close, default 08:00"
         timestamptz updated_at
     }
     watches {
@@ -142,7 +144,8 @@ erDiagram
         text channel "email"
         text kind "immediate|daily"
         uuid collection_run_id FK "nullable, immediate only"
-        date digest_on "nullable, daily only"
+        date digest_on "nullable, daily only; UTC date of close"
+        timestamptz digest_close_at "nullable, daily close instant"
         text status
         int attempts
         timestamptz next_attempt_at "nullable"
@@ -179,6 +182,11 @@ Notes:
 - `program_snapshots` / `asset_snapshots` are pointer tables, not copies.
 - `changes` uses partial unique indexes (NULL-safe) — see `docs/database.md`.
 - `subscriptions.user_id` is both PK and FK (one row per user, created only
-  when the user saves the dashboard).
+  when the user saves the dashboard). `digest_timezone` + `digest_time_local`
+  set the personal daily close ([close-24h, close)); defaults UTC/08:00.
+- `notification_deliveries` enforces immediate-vs-daily column rules via
+  `CHECK (kind ... collection_run_id ... digest_on)`. Daily uniqueness is
+  on the exact close instant (`digest_close_at`), not the calendar date,
+  so a 23-hour DST day with two same-date closes still delivers both.
 - `notification_deliveries` enforces immediate-vs-daily column rules via
   `CHECK (kind ... collection_run_id ... digest_on)`.

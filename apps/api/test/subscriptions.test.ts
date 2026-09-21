@@ -158,6 +158,78 @@ describe("subscriptions", () => {
     expect(res.body.error.code).toBe("BAD_REQUEST");
   });
 
+  it("PUT saves digest prefs and GET returns them with a next digest", async () => {
+    if (!db) return;
+    const app = buildApp();
+    const cookie = await loginAs("digestpref@example.com");
+    const put = await request(app)
+      .put("/api/v1/subscriptions")
+      .set("Cookie", cookie)
+      .send({
+        frequency: "daily",
+        watchNewPrograms: false,
+        watchAllPrograms: true,
+        digestTimezone: "Asia/Kolkata",
+        digestTimeLocal: "13:30",
+      })
+      .expect(200);
+    expect(put.body.data).toMatchObject({
+      frequency: "daily",
+      digestTimezone: "Asia/Kolkata",
+      digestTimeLocal: "13:30",
+    });
+    expect(typeof put.body.data.nextDigestAt).toBe("string");
+    const get = await request(app)
+      .get("/api/v1/subscriptions")
+      .set("Cookie", cookie)
+      .expect(200);
+    expect(get.body.data).toMatchObject({
+      digestTimezone: "Asia/Kolkata",
+      digestTimeLocal: "13:30",
+    });
+  });
+
+  it("PUT defaults digest prefs to 08:00 UTC when omitted", async () => {
+    if (!db) return;
+    const app = buildApp();
+    const cookie = await loginAs("digestdef@example.com");
+    const res = await request(app)
+      .put("/api/v1/subscriptions")
+      .set("Cookie", cookie)
+      .send({ frequency: "daily", watchNewPrograms: false, watchAllPrograms: true })
+      .expect(200);
+    expect(res.body.data).toMatchObject({
+      digestTimezone: "UTC",
+      digestTimeLocal: "08:00",
+    });
+  });
+
+  it("PUT rejects unknown timezones and malformed times", async () => {
+    if (!db) return;
+    const app = buildApp();
+    const cookie = await loginAs("badpref@example.com");
+    const base = {
+      frequency: "daily",
+      watchNewPrograms: false,
+      watchAllPrograms: true,
+    };
+    await request(app)
+      .put("/api/v1/subscriptions")
+      .set("Cookie", cookie)
+      .send({ ...base, digestTimezone: "Mars/Olympus" })
+      .expect(400);
+    await request(app)
+      .put("/api/v1/subscriptions")
+      .set("Cookie", cookie)
+      .send({ ...base, digestTimeLocal: "8pm" })
+      .expect(400);
+    await request(app)
+      .put("/api/v1/subscriptions")
+      .set("Cookie", cookie)
+      .send({ ...base, digestTimeLocal: "24:00" })
+      .expect(400);
+  });
+
   it("watches add/list/remove round-trip", async () => {
     if (!db) return;
     const { db: database } = needDeps();

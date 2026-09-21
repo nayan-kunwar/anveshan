@@ -246,6 +246,18 @@ paths:
                   type: boolean
                 watchAllPrograms:
                   type: boolean
+                digestTimezone:
+                  type: string
+                  example: Asia/Kolkata
+                  description: >
+                    IANA timezone for the daily close. Optional; omitted
+                    fields leave stored values unchanged.
+                digestTimeLocal:
+                  type: string
+                  example: "13:30"
+                  description: >
+                    Wall-clock daily close (24h HH:MM) in digestTimezone.
+                    Optional; omitted fields leave stored values unchanged.
       responses:
         "200":
           description: Saved subscription
@@ -497,7 +509,15 @@ components:
     Subscription:
       type: object
       nullable: true
-      required: [frequency, watchNewPrograms, watchAllPrograms]
+      required:
+        [
+          frequency,
+          watchNewPrograms,
+          watchAllPrograms,
+          digestTimezone,
+          digestTimeLocal,
+          updatedAt,
+        ]
       properties:
         frequency:
           type: string
@@ -506,6 +526,20 @@ components:
           type: boolean
         watchAllPrograms:
           type: boolean
+        digestTimezone:
+          type: string
+          example: Asia/Kolkata
+          description: IANA timezone for the daily close.
+        digestTimeLocal:
+          type: string
+          example: "13:30"
+          description: Wall-clock daily close (24h HH:MM) in digestTimezone.
+        nextDigestAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            Next daily close (null for immediate cadence or unusable prefs).
         updatedAt:
           type: string
           format: date-time

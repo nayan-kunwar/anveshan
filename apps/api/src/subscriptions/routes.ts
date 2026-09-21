@@ -1,4 +1,4 @@
-import type { Database } from "@anveshan/database";
+import type { Database, SubscriptionRow } from "@anveshan/database";
 import {
   addWatch,
   clearUnsubscribed,
@@ -8,6 +8,7 @@ import {
   removeWatch,
   upsertSubscription,
 } from "@anveshan/database";
+import { nextClose } from "@anveshan/notifications";
 import type { Request, Response } from "express";
 import type { z } from "zod";
 import { AppError } from "../errors.js";
@@ -42,6 +43,36 @@ function userIdOf(req: Request): string {
   return (req as Request & { user: SessionUser }).user.id;
 }
 
+/**
+ * Public subscription shape. digestTimeLocal is minute precision
+ * ("HH:MM"); nextDigestAt previews the coming daily close (null for
+ * immediate cadence or unusable prefs).
+ */
+function toSubscriptionResponse(row: SubscriptionRow): {
+  frequency: string;
+  watchNewPrograms: boolean;
+  watchAllPrograms: boolean;
+  digestTimezone: string;
+  digestTimeLocal: string;
+  nextDigestAt: string | null;
+  updatedAt: string;
+} {
+  const nextDigestAt =
+    row.frequency === "daily"
+      ? (nextClose(new Date(), row.digestTimezone, row.digestTimeLocal)?.toISOString() ??
+        null)
+      : null;
+  return {
+    frequency: row.frequency,
+    watchNewPrograms: row.watchNewPrograms,
+    watchAllPrograms: row.watchAllPrograms,
+    digestTimezone: row.digestTimezone,
+    digestTimeLocal: row.digestTimeLocal.slice(0, 5),
+    nextDigestAt,
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 export function createSubscriptionRoutes(deps: SubscriptionRouteDeps): {
   getSubscription: (req: Request, res: Response) => Promise<void>;
   putSubscription: (req: Request, res: Response) => Promise<void>;
@@ -53,14 +84,7 @@ export function createSubscriptionRoutes(deps: SubscriptionRouteDeps): {
     getSubscription: async (req, res) => {
       const row = await findSubscription(deps.db, userIdOf(req));
       res.status(200).json({
-        data: row
-          ? {
-              frequency: row.frequency,
-              watchNewPrograms: row.watchNewPrograms,
-              watchAllPrograms: row.watchAllPrograms,
-              updatedAt: row.updatedAt.toISOString(),
-            }
-          : null,
+        data: row ? toSubscriptionResponse(row) : null,
       });
     },
 
@@ -71,12 +95,7 @@ export function createSubscriptionRoutes(deps: SubscriptionRouteDeps): {
       // Saving a subscription opts back in after an unsubscribe link.
       await clearUnsubscribed(deps.db, userId);
       res.status(200).json({
-        data: {
-          frequency: row.frequency,
-          watchNewPrograms: row.watchNewPrograms,
-          watchAllPrograms: row.watchAllPrograms,
-          updatedAt: row.updatedAt.toISOString(),
-        },
+        data: toSubscriptionResponse(row),
       });
     },
 

@@ -20,27 +20,3 @@ export function formatDateTime(iso: string): string {
     timeZoneName: "short",
   }).format(date);
 }
-
-/**
- * Viewer-local equivalent of the 08:00 UTC daily digest time,
- * e.g. `13:30` in India. Returns null when the viewer is in UTC
- * (no suffix needed) — and always computed live, so DST zones shift
- * correctly with no branches.
- */
-export function localDigestTime(utcHour = 8, utcMinute = 0): string | null {
-  const probe = new Date(Date.UTC(2026, 0, 1, utcHour, utcMinute));
-  const parts = new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZoneName: "shortOffset",
-  }).formatToParts(probe);
-  const offset = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
-  if (offset === "GMT") return null;
-  const time = new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(probe);
-  return `${time} your time`;
-}

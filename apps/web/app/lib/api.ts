@@ -54,6 +54,9 @@ export interface Subscription {
   frequency: "immediate" | "daily";
   watchNewPrograms: boolean;
   watchAllPrograms: boolean;
+  digestTimezone: string;
+  digestTimeLocal: string;
+  nextDigestAt: string | null;
   updatedAt: string;
 }
 
@@ -102,6 +105,8 @@ export function putSubscription(input: {
   frequency: "immediate" | "daily";
   watchNewPrograms: boolean;
   watchAllPrograms: boolean;
+  digestTimezone?: string;
+  digestTimeLocal?: string;
 }): Promise<{ data: Subscription }> {
   return api<{ data: Subscription }>("/api/v1/subscriptions", {
     method: "PUT",

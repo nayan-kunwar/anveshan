@@ -24,8 +24,10 @@ deliveryWorker (setInterval, every 30s; no-op if NOTIFICATIONS_ENABLED=false)
   render email → nodemailer (10s timeout) → sent / skipped / failed / retry
         │
         ▼
-dailyDigestCron (08:00 UTC)
-  for each daily user: query 24h window, filter, insert pending delivery
+dailyTickCron (every minute, DIGEST_TICK_CRON)
+  for each daily user whose personal close just passed:
+    window = [close-24h, close), filter, insert pending delivery
+    (digest_close_at pins the exact close instant)
   deliveryWorker sends
 ```
 
@@ -85,8 +87,17 @@ subscriptions
   frequency          TEXT NOT NULL CHECK (frequency IN ('immediate', 'daily'))
   watch_new_programs BOOLEAN NOT NULL DEFAULT false
   watch_all_programs BOOLEAN NOT NULL DEFAULT false
+  digest_timezone    TEXT NOT NULL DEFAULT 'UTC'   -- IANA, validated on write
+  digest_time_local  TIME NOT NULL DEFAULT '08:00' -- wall-clock HH:MM close
   updated_at         TIMESTAMPTZ DEFAULT now()
 ```
+
+`digest_timezone` + `digest_time_local` are the user's daily close:
+the digest covers [close-24h, close), where close is the latest instant
+at or before now with that wall time in that zone (Intl math, no date
+library). Defaults preserve the old global 08:00 UTC digest. DST-gap
+days (wall time never occurs) yield the previous day's close — no digest
+that day, no error.
 
 ### watches
 
@@ -109,6 +120,7 @@ notification_deliveries
   kind              TEXT NOT NULL
   collection_run_id UUID REFERENCES collection_runs(id) ON DELETE CASCADE
   digest_on         DATE NULL
+  digest_close_at   TIMESTAMPTZ NULL  -- exact close instant (new daily rows)
   status            TEXT NOT NULL DEFAULT 'pending'
   attempts          INTEGER NOT NULL DEFAULT 0
   next_attempt_at   TIMESTAMPTZ NULL
@@ -127,8 +139,11 @@ notification_deliveries
   )
 
   -- Partial uniques (index inference, not ON CONSTRAINT)
+  -- Daily uniqueness is on the exact close instant, not the calendar
+  -- date: on a 23-hour DST day two closes can share one UTC date.
+  -- NULL close_at rows (pre-per-user digests) never conflict.
   UNIQUE (user_id, collection_run_id, channel) WHERE kind = 'immediate'
-  UNIQUE (user_id, digest_on, channel)         WHERE kind = 'daily'
+  UNIQUE (user_id, digest_close_at, channel)  WHERE kind = 'daily'
 
   -- Worker query performance
   INDEX (status, next_attempt_at, created_at) WHERE status IN ('pending', 'sending')
@@ -174,9 +189,9 @@ Frequency switch and catch-up (v1, best-effort — no `updated_at` vs window
 filtering):
 
 - Catch-up uses **who is eligible now**, not who was eligible when the
-  window closed. A user who switches immediate → daily after 08:00 UTC
-  may still get that UTC day's digest (yesterday 08:00 → today 08:00)
-  and may already have received immediate mail for some of those runs.
+  window closed. A user who switches immediate → daily may still get a
+  digest covering the previous 24h on the next tick/catch-up, and may
+  already have received immediate mail for some of those runs.
 - daily → immediate: an in-flight digest row for today may still send;
   later collections enqueue as immediate.
 - New immediate subscribers may get a 24h catch-up backfill of recent
@@ -357,31 +372,32 @@ Scheduler hook uses its own `.catch`. An enqueue throw must never log
 ### Enqueue (daily digest)
 
 ```
-dailyDigestCron (08:00 UTC, node-cron timezone: 'UTC'):
+digestTickCron (every minute, node-cron timezone: 'UTC'):
   if (!NOTIFICATIONS_ENABLED) return
-  enqueueDailyDigest(pool, today's UTC date)
+  enqueueDueDigests(pool, now)
 
-enqueueDailyDigest(pool, digest_on):   -- digest_on is a UTC date; shared with catch-up
-  window_end   = digest_on 08:00:00 UTC
-  window_start = window_end - 24 hours
-
-  1. Load changes ONCE:
-     SELECT changes.*, programs.name
-     FROM changes JOIN programs ON changes.program_id = programs.id
-     WHERE changes.detected_at >= window_start
-     AND   changes.detected_at <  window_end
-  2. Load eligible users:
-     WHERE email_verified_at IS NOT NULL
-     AND   unsubscribed_at IS NULL
-     AND   frequency = 'daily'
-  3. For each user:
-     - Apply filter matrix
-     - If no changes pass filters → skip
-     - INSERT INTO notification_deliveries (pending)
-       ON CONFLICT (user_id, digest_on, channel) WHERE kind = 'daily'
-       DO NOTHING
-  4. deliveryWorker sends
+enqueueDueDigests(pool, now):   -- shared with catch-up via enqueueCloseGroups
+  for each eligible daily user:
+    close = lastClose(now, digest_timezone, digest_time_local)
+      (null on invalid prefs → warn + skip; prefs are validated on write)
+    if close is within the last 65s:
+      window = [close - 24h, close)
+      load that window's changes ONCE per distinct close instant
+        (recipients grouped by close; one changes query per group)
+      per user: apply filter matrix; skip on zero matches
+      INSERT INTO notification_deliveries (pending, digest_on = UTC date
+        of close, digest_close_at = close)
+        ON CONFLICT (user_id, digest_close_at, channel)
+        WHERE kind = 'daily' DO NOTHING
+  deliveryWorker sends
 ```
+
+`digest_on` stays as the human-readable UTC date of the close; the
+pinned `digest_close_at` is the identity. Send time re-derives the
+window from the stored close (`digestWindowForDelivery`), so enqueue
+and send agree by construction — including DST overlap days.
+`NULL close_at` rows (enqueued before per-user digests) fall back to
+the legacy `digest_on` 08:00 UTC window.
 
 Digest window query uses `changes.detected_at`. Add
 `INDEX changes_detected_at_idx ON changes (detected_at)` in the
@@ -411,13 +427,12 @@ catchUpImmediate(pool):
       enqueueImmediate(pool, run.id)
 
 catchUpDailyDigest(pool, now):
-  -- Closed windows only: a window ending at D 08:00 UTC is closed
-  -- when now >= D 08:00 UTC. Cover the last two closed dates so a
-  -- >24h outage still delivers yesterday + the day before.
-  last_close_date =
-    (now >= today 08:00 UTC) ? today : yesterday
-  for digest_on in [last_close_date, last_close_date - 1 day]:
-    enqueueDailyDigest(pool, digest_on)
+  -- Per user: enqueue the last two closes (covers missed ticks and
+  -- >24h outages for that user's own schedule). Idempotent.
+  for each eligible daily user:
+    latest = lastClose(now, digest_timezone, digest_time_local)
+    prev   = lastClose(latest - 1s, digest_timezone, digest_time_local)
+    enqueue both via the shared grouped core (DO NOTHING on repeats)
 ```
 
 Do not insert a delivery row for a run/day that filters to zero users.
@@ -511,20 +526,31 @@ re-filter). Do not use `sent` for that — ops would think SMTP succeeded.
 ## Daily window
 
 ```
-DAILY_DIGEST_CRON = "0 8 * * *"   (UTC)
+Per-user close from subscriptions (digest_timezone + digest_time_local):
 
-For digest_on = 2026-09-18:
-  window_end   = 2026-09-18 08:00:00 UTC
-  window_start = 2026-09-17 08:00:00 UTC   (window_end - 24h)
+  close        = lastClose(now, tz, HH:MM)   -- latest instant <= now
+  window_start = close - 24 hours
+  window_end   = close
+
+Example: digest_time_local 13:30, digest_timezone Asia/Kolkata.
+For a tick at 2026-09-18T09:00:00Z:
+  close        = 2026-09-18 08:00:00 UTC  (13:30 IST)
+  window_start = 2026-09-17 08:00:00 UTC
 
   changes.detected_at >= window_start
   AND changes.detected_at <  window_end
 ```
 
-Double-send prevention: `UNIQUE (user_id, digest_on, channel) WHERE kind = 'daily'`
+Double-send prevention: `UNIQUE (user_id, digest_close_at, channel)
+WHERE kind = 'daily'`.
 
-Missed 08:00 (API down): `catchUpDailyDigest` enqueues the last two closed
-windows. Already-inserted rows hit `ON CONFLICT DO NOTHING`.
+Missed closes (API down, slow tick): `catchUpDailyDigest` enqueues each
+user's last two closes. Already-inserted rows hit `ON CONFLICT DO NOTHING`.
+
+On a DST-overlap day a user whose close falls in the repeated hour gets
+one digest per occurrence (distinct close instants, overlapping windows).
+On a DST-gap day there is no close — no digest that day; the previous
+day's digest was already delivered.
 
 ---
 
@@ -585,18 +611,18 @@ Unsubscribe: {FRONTEND_URL}/unsubscribe?user={userId}&token={hmac}
 
 ## Endpoints
 
-| Method | Path                                       | Auth         | Description                                        |
-| ------ | ------------------------------------------ | ------------ | -------------------------------------------------- |
-| POST   | `/api/v1/auth/request-magic-link`          | none         | Send magic link (rate-limited per IP + email)      |
-| POST   | `/api/v1/auth/verify`                      | none         | Verify token → session cookie                      |
-| GET    | `/api/v1/auth/me`                          | session      | Current user                                       |
-| POST   | `/api/v1/auth/logout`                      | session      | Delete session + clear cookie                      |
-| GET    | `/api/v1/subscriptions`                    | session      | Get my subscription config                         |
-| PUT    | `/api/v1/subscriptions`                    | session      | Set frequency + watch flags; clear unsubscribed_at |
-| GET    | `/api/v1/subscriptions/watches`            | session      | List my watched programs                           |
-| POST   | `/api/v1/subscriptions/watches`            | session      | Add program (404 if unknown)                       |
-| DELETE | `/api/v1/subscriptions/watches/:programId` | session      | Remove from watch list                             |
-| POST   | `/api/v1/unsubscribe`                      | signed token | Global unsubscribe                                 |
+| Method | Path                                       | Auth         | Description                                                       |
+| ------ | ------------------------------------------ | ------------ | ----------------------------------------------------------------- |
+| POST   | `/api/v1/auth/request-magic-link`          | none         | Send magic link (rate-limited per IP + email)                     |
+| POST   | `/api/v1/auth/verify`                      | none         | Verify token → session cookie                                     |
+| GET    | `/api/v1/auth/me`                          | session      | Current user                                                      |
+| POST   | `/api/v1/auth/logout`                      | session      | Delete session + clear cookie                                     |
+| GET    | `/api/v1/subscriptions`                    | session      | Get my subscription config                                        |
+| PUT    | `/api/v1/subscriptions`                    | session      | Set frequency + watch flags + digest prefs; clear unsubscribed_at |
+| GET    | `/api/v1/subscriptions/watches`            | session      | List my watched programs                                          |
+| POST   | `/api/v1/subscriptions/watches`            | session      | Add program (404 if unknown)                                      |
+| DELETE | `/api/v1/subscriptions/watches/:programId` | session      | Remove from watch list                                            |
+| POST   | `/api/v1/unsubscribe`                      | signed token | Global unsubscribe                                                |
 
 Public (no auth): `/health`, `/api/v1/programs*`
 
@@ -645,7 +671,7 @@ FRONTEND_URL=http://localhost:3001
 # Notifications
 NOTIFICATIONS_ENABLED=false         # false in tests, true in prod
 AUTH_EMAIL_ENABLED=                 # auto-derived when unset (true if SMTP_* set)
-DAILY_DIGEST_CRON=0 8 * * *        # 8am UTC
+DIGEST_TICK_CRON=* * * * *          # per-minute tick over personal digest closes
 IMMEDIATE_EMAIL_CAP=20              # max programs per email
 ASSET_EMAIL_CAP=10                  # max asset lines per program
 ```
@@ -743,7 +769,7 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 11. Catch-up (`catchUpImmediate`, `catchUpDailyDigest`; eligibility now)
 12. Delivery worker (drain mutex, claim CTE, stale recovery decrements
     attempts, reload changes + re-filter, `skipped` vs `sent`)
-13. Digest cron (timezone: UTC; no-op if NOTIFICATIONS_ENABLED=false)
+13. Digest tick (every minute; per-user closes; no-op if NOTIFICATIONS_ENABLED=false)
 14. Hook into scheduler + CLI (post-collection enqueue in its own try/catch)
 15. Start worker + digest cron + catch-up on API boot (`index.ts`)
 16. Next.js frontend (login, dashboard, unsubscribe confirm)
@@ -763,6 +789,12 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 | Stale `sending` rows reset to `pending`                                     | Crash recovery                         |
 | Stale `sending` with attempts=3 → pending attempts=2, claimed again         | Crash does not exhaust retries         |
 | `enqueueDailyDigest` twice for same digest_on → 1 row                       | Unique constraint                      |
+| `lastClose` skips DST-gap wall times, resolves overlaps to latest ≤ now     | Close math                             |
+| `nextClose` jumps a DST-gap day                                             | Close math                             |
+| Tick enqueues only users whose close just passed; repeat tick inserts 0     | Per-user tick                          |
+| Same UTC date, different close (23h DST day) → 2 rows                       | Close-instant identity                 |
+| Same close under any date string → 1 row                                    | Close-instant identity                 |
+| Worker sends from pinned `digest_close_at`; NULL falls back to legacy       | Enqueue/send agreement                 |
 | `renderImmediate` caps at 20 programs, 10 assets                            | Caps                                   |
 | `renderDaily` same caps                                                     | Caps                                   |
 | `request-magic-link` → EMAIL_RATE_LIMITED after threshold                   | Rate limiting                          |
@@ -795,19 +827,20 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 
 ## Files to create
 
-| File                                      | Purpose                                                       |
-| ----------------------------------------- | ------------------------------------------------------------- |
-| `packages/notifications/src/index.ts`     | Public API                                                    |
-| `packages/notifications/src/smtp.ts`      | nodemailer transport (10s send timeout)                       |
-| `packages/notifications/src/templates.ts` | renderImmediate, renderDaily (pure)                           |
-| `apps/api/src/auth/routes.ts`             | request-magic-link, verify, me, logout                        |
-| `apps/api/src/auth/middleware.ts`         | requireSession                                                |
-| `apps/api/src/auth/tokens.ts`             | HMAC helpers (magic link + unsubscribe)                       |
-| `apps/api/src/auth/rate-limit.ts`         | Per-IP + per-email rate limiter                               |
-| `apps/api/src/subscriptions/routes.ts`    | Subscription + watch CRUD                                     |
-| `apps/api/src/notifications/enqueue.ts`   | enqueueImmediate, enqueueDailyDigest, catch-up                |
-| `apps/api/src/notifications/worker.ts`    | Drain mutex + claim + send + retry + stale recovery + skipped |
-| `apps/web/`                               | Next.js (login, dashboard, unsubscribe confirm)               |
+| File                                        | Purpose                                                       |
+| ------------------------------------------- | ------------------------------------------------------------- |
+| `packages/notifications/src/index.ts`       | Public API                                                    |
+| `packages/notifications/src/smtp.ts`        | nodemailer transport (10s send timeout)                       |
+| `packages/notifications/src/templates.ts`   | renderImmediate, renderDaily (pure)                           |
+| `packages/notifications/src/digest-time.ts` | per-user close math: lastClose, nextClose (pure, Intl only)   |
+| `apps/api/src/auth/routes.ts`               | request-magic-link, verify, me, logout                        |
+| `apps/api/src/auth/middleware.ts`           | requireSession                                                |
+| `apps/api/src/auth/tokens.ts`               | HMAC helpers (magic link + unsubscribe)                       |
+| `apps/api/src/auth/rate-limit.ts`           | Per-IP + per-email rate limiter                               |
+| `apps/api/src/subscriptions/routes.ts`      | Subscription + watch CRUD                                     |
+| `apps/api/src/notifications/enqueue.ts`     | enqueueImmediate, enqueueDailyDigest, catch-up                |
+| `apps/api/src/notifications/worker.ts`      | Drain mutex + claim + send + retry + stale recovery + skipped |
+| `apps/web/`                                 | Next.js (login, dashboard, unsubscribe confirm)               |
 
 ## Files to modify
 

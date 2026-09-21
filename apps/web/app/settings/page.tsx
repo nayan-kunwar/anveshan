@@ -1,13 +1,35 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ApiError, getSubscription, logout, me, putSubscription } from "../lib/api";
 import type { Subscription, User } from "../lib/api";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { localDigestTime } from "../lib/datetime";
+import { formatDateTime } from "../lib/datetime";
+
+function browserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return "UTC";
+  }
+}
+
+function availableTimezones(): string[] {
+  try {
+    const values = (
+      Intl as unknown as {
+        supportedValuesOf?: (key: string) => string[];
+      }
+    ).supportedValuesOf?.("timeZone");
+    if (values && values.length > 0) return values;
+  } catch {
+    // Fall through to the minimal list below.
+  }
+  return ["UTC"];
+}
 
 export default function SettingsPage(): ReactNode {
   const router = useRouter();
@@ -16,9 +38,14 @@ export default function SettingsPage(): ReactNode {
   const [frequency, setFrequency] = useState<"immediate" | "daily">("immediate");
   const [watchNew, setWatchNew] = useState(false);
   const [watchAll, setWatchAll] = useState(false);
+  const [digestTime, setDigestTime] = useState("08:00");
+  const [digestTimezone, setDigestTimezone] = useState<string>(() => browserTimezone());
+  const [nextDigestAt, setNextDigestAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  const timezones = useMemo(() => availableTimezones(), []);
 
   const load = useCallback(async () => {
     try {
@@ -30,6 +57,9 @@ export default function SettingsPage(): ReactNode {
         setFrequency(subRes.data.frequency);
         setWatchNew(subRes.data.watchNewPrograms);
         setWatchAll(subRes.data.watchAllPrograms);
+        setDigestTime(subRes.data.digestTimeLocal);
+        setDigestTimezone(subRes.data.digestTimezone);
+        setNextDigestAt(subRes.data.nextDigestAt);
       }
     } catch (err) {
       if (err instanceof ApiError && err.code === "UNAUTHORIZED") {
@@ -53,8 +83,11 @@ export default function SettingsPage(): ReactNode {
         frequency,
         watchNewPrograms: watchNew,
         watchAllPrograms: watchAll,
+        digestTimezone,
+        digestTimeLocal: digestTime,
       });
       setSub(res.data);
+      setNextDigestAt(res.data.nextDigestAt);
       setSaved(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Save failed");
@@ -78,10 +111,6 @@ export default function SettingsPage(): ReactNode {
     );
   }
 
-  const local = localDigestTime();
-  const dailyLabel =
-    local === null ? "Daily digest (08:00 UTC)" : `Daily digest (08:00 UTC · ${local})`;
-
   return (
     <div className="shell">
       <Sidebar email={user.email} onSignOut={() => void onLogout()} active="settings" />
@@ -100,9 +129,43 @@ export default function SettingsPage(): ReactNode {
               }
             >
               <option value="immediate">Immediate (after each collection)</option>
-              <option value="daily">{dailyLabel}</option>
+              <option value="daily">Daily digest</option>
             </select>
           </label>
+          {frequency === "daily" ? (
+            <>
+              <label className="row">
+                Digest time
+                <input
+                  type="time"
+                  value={digestTime}
+                  onChange={(e) => setDigestTime(e.target.value)}
+                />
+              </label>
+              <label className="row">
+                Timezone
+                <select
+                  value={digestTimezone}
+                  onChange={(e) => setDigestTimezone(e.target.value)}
+                >
+                  {timezones.includes(digestTimezone) ? null : (
+                    <option value={digestTimezone}>{digestTimezone}</option>
+                  )}
+                  {timezones.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="desc">
+                One email per day covering the 24 hours before {digestTime} (
+                {digestTimezone}
+                ).
+                {nextDigestAt ? <> Next digest: {formatDateTime(nextDigestAt)}.</> : null}
+              </p>
+            </>
+          ) : null}
           <label className="row">
             <input
               type="checkbox"

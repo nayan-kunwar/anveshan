@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidTimezone } from "@anveshan/notifications";
 
 const pageSchema = z.coerce.number().int().min(1).default(1);
 const pageSizeSchema = (def: number): z.ZodDefault<z.ZodNumber> =>
@@ -58,6 +59,19 @@ export const subscriptionBodySchema = z.object({
   frequency: z.enum(["immediate", "daily"]),
   watchNewPrograms: z.boolean(),
   watchAllPrograms: z.boolean(),
+  // Daily close preference (IANA timezone + 24h HH:MM). Optional:
+  // omitted fields leave stored values unchanged. Ignored for
+  // immediate delivery but stored anyway.
+  digestTimezone: z
+    .string()
+    .min(1, "Timezone is required")
+    .max(64)
+    .refine((tz) => isValidTimezone(tz), "Unknown timezone")
+    .optional(),
+  digestTimeLocal: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Use HH:MM, 24-hour")
+    .optional(),
 });
 
 export type SubscriptionBody = z.infer<typeof subscriptionBodySchema>;
