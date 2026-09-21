@@ -88,6 +88,9 @@ function normalizeScope(
     logger.warn("Dropping scope with unusable identifier", {
       programHandle,
       scopeId: item.id,
+      // Truncated raw text so drops are auditable (which program lists
+      // what) without flooding logs. Scope data is public by design.
+      identifier: item.assetIdentifier.slice(0, 200),
     });
     return null;
   }

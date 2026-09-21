@@ -152,6 +152,48 @@ describe("HackerOneClient scopes", () => {
     expect(warnings.length).toBeGreaterThan(0);
   });
 
+  it("logs the truncated identifier when dropping unusable scopes", async () => {
+    const longJunk = `not a url ${"x".repeat(300)}`;
+    const fetchFn: FetchFn = async () =>
+      jsonResponse({
+        data: [
+          {
+            id: "9",
+            attributes: {
+              asset_type: "URL",
+              asset_identifier: "just some words, not a url",
+              eligible_for_bounty: true,
+            },
+          },
+          {
+            id: "10",
+            attributes: {
+              asset_type: "URL",
+              asset_identifier: longJunk,
+              eligible_for_bounty: false,
+            },
+          },
+        ],
+        links: {},
+      });
+    const details: Record<string, unknown>[] = [];
+    const collector = new HackerOneCollector(clientWith(fetchFn), {
+      warn: (_m: string, context?: Record<string, unknown>) => {
+        if (context) details.push(context);
+      },
+    });
+    await expect(collector.getProgramAssets("acme")).resolves.toEqual([]);
+    const drops = details.filter((d) => d["scopeId"] === "9" || d["scopeId"] === "10");
+    expect(drops).toHaveLength(2);
+    expect(drops[0]).toMatchObject({
+      programHandle: "acme",
+      scopeId: "9",
+      identifier: "just some words, not a url",
+    });
+    // Long identifiers are capped so one row cannot flood the logs.
+    expect(drops[1]?.["identifier"]).toHaveLength(200);
+  });
+
   it("retries 429 honoring Retry-After then succeeds", async () => {
     let calls = 0;
     const fetchFn: FetchFn = async () => {
