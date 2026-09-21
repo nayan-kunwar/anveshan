@@ -8,7 +8,7 @@ export default function Sidebar({
 }: {
   email: string;
   onSignOut: () => void;
-  active?: "dashboard" | "programs";
+  active?: "dashboard" | "programs" | "settings";
 }): ReactNode {
   return (
     <aside className="sidebar">
@@ -21,6 +21,9 @@ export default function Sidebar({
         </Link>
         <Link href="/programs" className={active === "programs" ? "active" : undefined}>
           Programs
+        </Link>
+        <Link href="/settings" className={active === "settings" ? "active" : undefined}>
+          Settings
         </Link>
       </nav>
       <div className="sidebar-foot">

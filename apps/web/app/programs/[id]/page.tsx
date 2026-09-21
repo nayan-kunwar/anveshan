@@ -16,6 +16,7 @@ import {
   removeWatch,
 } from "../../lib/api";
 import type { Asset, Change, Program, User } from "../../lib/api";
+import { formatDateTime } from "../../lib/datetime";
 import Sidebar from "../../components/Sidebar";
 import StatCard from "../../components/StatCard";
 import Topbar from "../../components/Topbar";
@@ -326,8 +327,7 @@ export default function ProgramDetailPage(): ReactNode {
                 <span>
                   {changeSign(c.type)} {c.type}{" "}
                   <span className="small">
-                    {c.assetIdentifier ?? "program"} ·{" "}
-                    {new Date(c.detectedAt).toLocaleString()}
+                    {c.assetIdentifier ?? "program"} · {formatDateTime(c.detectedAt)}
                   </span>
                 </span>
               </li>

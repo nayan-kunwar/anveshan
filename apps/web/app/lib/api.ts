@@ -143,17 +143,6 @@ export async function listPrograms(page: number, pageSize = 25): Promise<Program
   return api<ProgramPage>(`/api/v1/programs?page=${page}&pageSize=${pageSize}`);
 }
 
-/** Load the program catalog (paged, up to 600) for the dashboard search box. */
-export async function listAllPrograms(): Promise<Program[]> {
-  const all: Program[] = [];
-  for (let page = 1; page <= 6; page += 1) {
-    const res = await api<ProgramPage>(`/api/v1/programs?page=${page}&pageSize=100`);
-    all.push(...res.data);
-    if (all.length >= res.pagination.total) break;
-  }
-  return all;
-}
-
 export function getProgram(id: string): Promise<{ data: Program }> {
   return api<{ data: Program }>(`/api/v1/programs/${id}`);
 }

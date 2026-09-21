@@ -4,8 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { ApiError, listPrograms, listWatches, logout, me } from "../lib/api";
+import {
+  ApiError,
+  addWatch,
+  listPrograms,
+  listWatches,
+  logout,
+  me,
+  removeWatch,
+} from "../lib/api";
 import type { Program, User } from "../lib/api";
+import { formatDateTime } from "../lib/datetime";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 
@@ -20,6 +29,7 @@ export default function ProgramsPage(): ReactNode {
   const [query, setQuery] = useState("");
   const [watchedOnly, setWatchedOnly] = useState(false);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
+  const [watchBusy, setWatchBusy] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +69,24 @@ export default function ProgramsPage(): ReactNode {
   async function onLogout(): Promise<void> {
     await logout();
     router.replace("/login");
+  }
+
+  async function onToggleWatch(programId: string): Promise<void> {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    setError(null);
+    setWatchBusy(programId);
+    try {
+      if (watchedIds.has(programId)) await removeWatch(programId);
+      else await addWatch(programId);
+      setWatchedIds(new Set((await listWatches()).data.map((w) => w.programId)));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Watch update failed");
+    } finally {
+      setWatchBusy(null);
+    }
   }
 
   const q = query.trim().toLowerCase();
@@ -116,6 +144,7 @@ export default function ProgramsPage(): ReactNode {
                 <th>Handle</th>
                 <th>Platform</th>
                 <th>Tracked</th>
+                {user ? <th>Watch</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -127,8 +156,19 @@ export default function ProgramsPage(): ReactNode {
                   <td className="small">{p.externalId}</td>
                   <td className="small">{p.platform}</td>
                   <td className="small" title={p.updatedAt}>
-                    {new Date(p.updatedAt).toLocaleString()}
+                    {formatDateTime(p.updatedAt)}
                   </td>
+                  {user ? (
+                    <td>
+                      <button
+                        type="button"
+                        disabled={watchBusy === p.id}
+                        onClick={() => void onToggleWatch(p.id)}
+                      >
+                        {watchedIds.has(p.id) ? "Unwatch" : "Watch"}
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

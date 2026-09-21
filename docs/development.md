@@ -107,8 +107,17 @@ server-paginated table of every tracked program (25/page) via
 `GET /api/v1/programs`, rows link to `/programs/:id`. Columns:
 Program, Handle, Platform, Tracked (date + time, ISO on hover).
 In-page filter only — the list endpoint has no search param.
-Logged-in users get a "Watched only" toggle (no separate watched
-page). Sidebar has Dashboard + Programs entries.
+Logged-in users get a "Watched only" toggle plus per-row
+Watch/Unwatch buttons (no separate watched page). Dashboard shows
+stats + watched list only; discovery lives on the catalog.
+Sidebar has Dashboard + Programs + Settings entries.
+
+## Settings page
+
+`apps/web/app/settings/page.tsx` (login required): notification
+preferences (frequency, new-program + watch-all flags, Save).
+Dashboard shows read-only cadence/scope stat cards and links to
+Settings when no subscription exists.
 
 ## Test split
 
