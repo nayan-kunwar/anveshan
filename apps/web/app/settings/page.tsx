@@ -7,7 +7,7 @@ import { ApiError, getSubscription, logout, me, putSubscription } from "../lib/a
 import type { Subscription, User } from "../lib/api";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { formatDateTime } from "../lib/datetime";
+import { formatDateTime, convertWallTime } from "../lib/datetime";
 
 function browserTimezone(): string {
   try {
@@ -46,6 +46,18 @@ export default function SettingsPage(): ReactNode {
   const [busy, setBusy] = useState(false);
 
   const timezones = useMemo(() => availableTimezones(), []);
+  const browserTz = useMemo(() => browserTimezone(), []);
+
+  // Guardrail: the typed time is interpreted in the selected zone, not
+  // the viewer's zone. Spell out the local equivalent on mismatch so a
+  // "my time vs UTC" mix-up is visible before Save.
+  const localHint = useMemo(() => {
+    if (frequency !== "daily") return null;
+    if (!digestTimezone || digestTimezone === browserTz) return null;
+    const converted = convertWallTime(digestTime, digestTimezone);
+    if (!converted) return null;
+    return `That's ${converted} your time (${browserTz}) — double-check the timezone.`;
+  }, [frequency, digestTimezone, digestTime, browserTz]);
 
   const load = useCallback(async () => {
     try {
@@ -164,6 +176,7 @@ export default function SettingsPage(): ReactNode {
                 ).
                 {nextDigestAt ? <> Next digest: {formatDateTime(nextDigestAt)}.</> : null}
               </p>
+              {localHint ? <p className="desc">{localHint}</p> : null}
             </>
           ) : null}
           <label className="row">
