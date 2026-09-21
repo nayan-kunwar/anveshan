@@ -33,6 +33,9 @@ import { createDeliveryWorker } from "./notifications/worker.js";
  * worker's catchUpImmediate only picks up runs reporting changes, so
  * zero counters isolate the digest path (or silence, for negatives)
  * from immediate catch-up. Documented in docs/development.md.
+ *
+ * The daily positive path temporarily aligns the target's digest close
+ * to now and restores their real prefs afterwards (success or failure).
  */
 
 type Cadence = "immediate" | "daily";
@@ -351,38 +354,51 @@ async function main(): Promise<void> {
       }
     } else {
       // Align the target's digest close to right now so the per-minute
-      // tick fires deterministically at any hour.
+      // tick fires deterministically at any hour. Snapshot first: the
+      // alignment overwrites the user's real prefs, restored below.
+      const origPrefs = {
+        frequency: opts.cadence,
+        watchNewPrograms: sub.watchNewPrograms,
+        watchAllPrograms: sub.watchAllPrograms,
+        digestTimezone: sub.digestTimezone,
+        digestTimeLocal: sub.digestTimeLocal,
+      };
       const now = new Date();
       const hh = String(now.getUTCHours()).padStart(2, "0");
       const mi = String(now.getUTCMinutes()).padStart(2, "0");
       await upsertSubscription(db, user.id, {
-        frequency: opts.cadence,
-        watchNewPrograms: sub.watchNewPrograms,
-        watchAllPrograms: sub.watchAllPrograms,
+        ...origPrefs,
         digestTimezone: "UTC",
         digestTimeLocal: `${hh}:${mi}`,
       });
-      const close = lastClose(now, "UTC", `${hh}:${mi}`);
-      if (!close) throw new Error("no closed digest window");
-      await db.execute(sql`
-        UPDATE changes SET detected_at = ${new Date(close.getTime() - 3_600_000)}
-        WHERE collection_run_id = ${run.id}`);
-      const enqueued = await enqueueDueDigests({ db, config, logger }, now);
-      const result = await worker.drain();
-      const rows = await db
-        .select({ status: notificationDeliveries.status })
-        .from(notificationDeliveries)
-        .where(
-          and(
-            eq(notificationDeliveries.userId, user.id),
-            eq(notificationDeliveries.kind, "daily"),
-          ),
+      try {
+        const close = lastClose(now, "UTC", `${hh}:${mi}`);
+        if (!close) throw new Error("no closed digest window");
+        await db.execute(sql`
+          UPDATE changes SET detected_at = ${new Date(close.getTime() - 3_600_000)}
+          WHERE collection_run_id = ${run.id}`);
+        const enqueued = await enqueueDueDigests({ db, config, logger }, now);
+        const result = await worker.drain();
+        const rows = await db
+          .select({ status: notificationDeliveries.status })
+          .from(notificationDeliveries)
+          .where(
+            and(
+              eq(notificationDeliveries.userId, user.id),
+              eq(notificationDeliveries.kind, "daily"),
+            ),
+          );
+        process.stdout.write(
+          `run: ${run.id}\nclose: ${close.toISOString()}\nprogram: ${program.id} (${opts.handle})\nenqueued: ${enqueued}\nclaimed: ${result.claimed} sent: ${result.sent} skipped: ${result.skipped}\ndeliveries for target: ${JSON.stringify(rows.map((r) => r.status))}\n`,
         );
-      process.stdout.write(
-        `run: ${run.id}\nclose: ${close.toISOString()}\nprogram: ${program.id} (${opts.handle})\nenqueued: ${enqueued}\nclaimed: ${result.claimed} sent: ${result.sent} skipped: ${result.skipped}\ndeliveries for target: ${JSON.stringify(rows.map((r) => r.status))}\n`,
-      );
-      if (!rows.some((r) => r.status === "sent")) {
-        throw new Error("no sent digest for target — check status/last_error");
+        if (!rows.some((r) => r.status === "sent")) {
+          throw new Error("no sent digest for target — check status/last_error");
+        }
+      } finally {
+        await upsertSubscription(db, user.id, origPrefs);
+        process.stdout.write(
+          `restored subscription prefs (${origPrefs.digestTimeLocal} ${origPrefs.digestTimezone})\n`,
+        );
       }
     }
   } finally {
