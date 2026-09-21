@@ -7,7 +7,12 @@ import { ApiError, getSubscription, logout, me, putSubscription } from "../lib/a
 import type { Subscription, User } from "../lib/api";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { formatDateTime, convertWallTime } from "../lib/datetime";
+import {
+  formatDateTime,
+  convertWallTime,
+  buildTimezoneOptions,
+  isValidTimezone,
+} from "../lib/datetime";
 
 function browserTimezone(): string {
   try {
@@ -47,6 +52,16 @@ export default function SettingsPage(): ReactNode {
 
   const timezones = useMemo(() => availableTimezones(), []);
   const browserTz = useMemo(() => browserTimezone(), []);
+  // Searchable picker: curated majors first so zones like Asia/Kolkata
+  // stay findable even when the browser's enumeration omits them. The
+  // stored value is always appended (legacy spellings keep working).
+  const timezoneOptions = useMemo(() => {
+    const options = buildTimezoneOptions(timezones);
+    const current = digestTimezone.trim();
+    if (current && !options.includes(current)) options.push(current);
+    return options;
+  }, [timezones, digestTimezone]);
+  const timezoneValid = frequency !== "daily" || isValidTimezone(digestTimezone.trim());
 
   // Guardrail: the typed time is interpreted in the selected zone, not
   // the viewer's zone. Spell out the local equivalent on mismatch so a
@@ -95,7 +110,7 @@ export default function SettingsPage(): ReactNode {
         frequency,
         watchNewPrograms: watchNew,
         watchAllPrograms: watchAll,
-        digestTimezone,
+        digestTimezone: digestTimezone.trim(),
         digestTimeLocal: digestTime,
       });
       setSub(res.data);
@@ -156,20 +171,21 @@ export default function SettingsPage(): ReactNode {
               </label>
               <label className="row">
                 Timezone
-                <select
+                <input
+                  list="tz-list"
                   value={digestTimezone}
+                  placeholder="Type to search, e.g. Asia/Kolkata"
                   onChange={(e) => setDigestTimezone(e.target.value)}
-                >
-                  {timezones.includes(digestTimezone) ? null : (
-                    <option value={digestTimezone}>{digestTimezone}</option>
-                  )}
-                  {timezones.map((tz) => (
-                    <option key={tz} value={tz}>
-                      {tz}
-                    </option>
+                />
+                <datalist id="tz-list">
+                  {timezoneOptions.map((tz) => (
+                    <option key={tz} value={tz} />
                   ))}
-                </select>
+                </datalist>
               </label>
+              {!timezoneValid ? (
+                <p className="error">Unknown timezone — pick one from the list.</p>
+              ) : null}
               <p className="desc">
                 One email per day covering the 24 hours before {digestTime} (
                 {digestTimezone}
@@ -199,7 +215,7 @@ export default function SettingsPage(): ReactNode {
             <button
               type="button"
               className="primary"
-              disabled={busy}
+              disabled={busy || !timezoneValid}
               onClick={() => void onSave()}
             >
               {busy ? "Saving…" : "Save"}

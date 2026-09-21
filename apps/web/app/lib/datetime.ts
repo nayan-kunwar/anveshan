@@ -22,6 +22,57 @@ export function formatDateTime(iso: string): string {
 }
 
 /**
+ * Curated common timezones in modern canonical spelling. Listed first in
+ * the picker so major zones are findable even when a browser's
+ * `supportedValuesOf("timeZone")` enumeration is stale (observed: missing
+ * Asia/Kolkata and Asia/Kathmandu while resolving them fine).
+ */
+export const COMMON_TIMEZONES: string[] = [
+  "UTC",
+  "Asia/Kolkata",
+  "Asia/Kathmandu",
+  "Asia/Dhaka",
+  "Asia/Jakarta",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Asia/Dubai",
+  "Europe/London",
+  "Europe/Berlin",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "Australia/Sydney",
+  "Pacific/Auckland",
+];
+
+/**
+ * Picker options: curated zones first, then the browser's full list
+ * minus duplicates. Pure (browser list injectable for tests).
+ */
+export function buildTimezoneOptions(browserZones: string[]): string[] {
+  const seen = new Set<string>();
+  const options: string[] = [];
+  for (const tz of [...COMMON_TIMEZONES, ...browserZones]) {
+    if (!tz || seen.has(tz)) continue;
+    seen.add(tz);
+    options.push(tz);
+  }
+  return options;
+}
+
+/** True when the runtime can resolve the zone (same check the API uses). */
+export function isValidTimezone(timeZone: string): boolean {
+  if (!timeZone) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Convert a daily "HH:MM" wall time in `fromTimeZone` to the same
  * instant rendered in another zone (default: the viewer's local zone),
  * e.g. ("00:31", "UTC") -> "6:01 AM" in India. Null on invalid input.

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { convertWallTime } from "../app/lib/datetime.js";
+import {
+  buildTimezoneOptions,
+  convertWallTime,
+  isValidTimezone,
+} from "../app/lib/datetime.js";
 
 describe("convertWallTime", () => {
   it("converts a UTC wall time to IST", () => {
@@ -29,5 +33,40 @@ describe("convertWallTime", () => {
     expect(convertWallTime("24:00", "UTC", "UTC")).toBeNull();
     expect(convertWallTime("08:00", "Mars/Olympus", "UTC")).toBeNull();
     expect(convertWallTime("08:00", "UTC", "Mars/Olympus")).toBeNull();
+  });
+});
+
+describe("buildTimezoneOptions", () => {
+  it("lists curated zones first, then the browser list without duplicates", () => {
+    const options = buildTimezoneOptions(["UTC", "Europe/Paris", "Asia/Kolkata"]);
+    expect(options[0]).toBe("UTC");
+    expect(options.indexOf("Asia/Kolkata")).toBeLessThan(options.indexOf("Europe/Paris"));
+    expect(options.filter((tz) => tz === "UTC")).toHaveLength(1);
+    expect(options.filter((tz) => tz === "Asia/Kolkata")).toHaveLength(1);
+    expect(options).toContain("Europe/Paris");
+  });
+
+  it("includes Kolkata even when the browser enumeration omits it", () => {
+    // Observed in the wild: supportedValuesOf without Asia/Kolkata.
+    const options = buildTimezoneOptions(["UTC", "Asia/Katmandu"]);
+    expect(options).toContain("Asia/Kolkata");
+    expect(options).toContain("Asia/Kathmandu");
+  });
+
+  it("skips blanks", () => {
+    expect(buildTimezoneOptions(["", "UTC"])).not.toContain("");
+  });
+});
+
+describe("isValidTimezone", () => {
+  it("accepts resolvable zones including modern spellings", () => {
+    expect(isValidTimezone("UTC")).toBe(true);
+    expect(isValidTimezone("Asia/Kolkata")).toBe(true);
+    expect(isValidTimezone("Asia/Calcutta")).toBe(true);
+  });
+
+  it("rejects junk", () => {
+    expect(isValidTimezone("Mars/Olympus")).toBe(false);
+    expect(isValidTimezone("")).toBe(false);
   });
 });
