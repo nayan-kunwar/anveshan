@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
-import { searchTimezones, timezoneLabel } from "../lib/datetime";
+import { searchTimezones, timezoneLabel, utcOffsetLabel } from "../lib/datetime";
 
 interface TimezonePickerProps {
   value: string;
@@ -25,7 +25,9 @@ export default function TimezonePicker({
 }: TimezonePickerProps): ReactNode {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [focused, setFocused] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
 
   const results = useMemo(
@@ -50,6 +52,7 @@ export default function TimezonePicker({
   function commit(tz: string): void {
     onChange(tz);
     setOpen(false);
+    inputRef.current?.blur();
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
@@ -76,23 +79,33 @@ export default function TimezonePicker({
   }
 
   const collapsedLabel = timezoneLabel(value)?.text ?? value;
+  // Collapsed display mirrors the mockup: raw IANA while editing,
+  // compact "Zone (offset)" once blurred.
+  const offset = utcOffsetLabel(value);
+  const displayValue =
+    focused || !value || !offset || offset === value ? value : `${value} (${offset})`;
 
   return (
     <div className="combo" ref={rootRef}>
       <input
+        ref={inputRef}
         type="text"
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
-        value={value}
+        value={displayValue}
         title={collapsedLabel}
         placeholder="Type country, city, or zone — e.g. India"
         onChange={(e) => {
           onChange(e.target.value);
           setOpen(true);
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          setFocused(true);
+          setOpen(true);
+        }}
+        onBlur={() => setFocused(false)}
         onKeyDown={onKeyDown}
       />
       {open && results.length > 0 ? (

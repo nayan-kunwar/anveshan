@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildTimezoneOptions,
   convertWallTime,
+  formatDigestInstant,
+  formatWallTime12h,
   isValidTimezone,
   searchTimezones,
   timezoneLabel,
+  utcOffsetLabel,
 } from "../app/lib/datetime.js";
 
 describe("convertWallTime", () => {
@@ -141,5 +144,44 @@ describe("searchTimezones", () => {
   it("returns everything on an empty query and nothing on no match", () => {
     expect(searchTimezones(options, "")).toHaveLength(4);
     expect(searchTimezones(options, "xyz-nope")).toEqual([]);
+  });
+});
+
+describe("formatWallTime12h", () => {
+  it("formats 24h wall times", () => {
+    expect(formatWallTime12h("09:00")).toBe("9:00 AM");
+    expect(formatWallTime12h("00:09")).toBe("12:09 AM");
+    expect(formatWallTime12h("12:00")).toBe("12:00 PM");
+    expect(formatWallTime12h("18:47")).toBe("6:47 PM");
+    expect(formatWallTime12h("08:00:00")).toBe("8:00 AM");
+  });
+
+  it("rejects malformed input", () => {
+    expect(formatWallTime12h("9am")).toBeNull();
+    expect(formatWallTime12h("24:00")).toBeNull();
+    expect(formatWallTime12h("")).toBeNull();
+  });
+});
+
+describe("utcOffsetLabel", () => {
+  it("returns exact numeric offsets", () => {
+    expect(utcOffsetLabel("UTC")).toBe("UTC");
+    expect(utcOffsetLabel("Asia/Kolkata")).toBe("UTC+5:30");
+    expect(utcOffsetLabel("America/New_York", new Date("2026-01-15T12:00:00Z"))).toBe(
+      "UTC-5:00",
+    );
+    expect(utcOffsetLabel("Mars/Olympus")).toBeNull();
+  });
+});
+
+describe("formatDigestInstant", () => {
+  it("renders the instant inside the digest zone", () => {
+    expect(formatDigestInstant(new Date("2026-09-22T03:30:00Z"), "Asia/Kolkata")).toBe(
+      "Tue, Sep 22 · 9:00 AM GMT+5:30",
+    );
+  });
+
+  it("returns null for invalid zones", () => {
+    expect(formatDigestInstant(new Date(), "Mars/Olympus")).toBeNull();
   });
 });

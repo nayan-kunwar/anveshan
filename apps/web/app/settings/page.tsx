@@ -7,8 +7,14 @@ import { ApiError, getSubscription, logout, me, putSubscription } from "../lib/a
 import type { Subscription, User } from "../lib/api";
 import Sidebar from "../components/Sidebar";
 import TimezonePicker from "../components/TimezonePicker";
+import Toggle from "../components/Toggle";
 import Topbar from "../components/Topbar";
-import { formatDateTime, buildTimezoneOptions, isValidTimezone } from "../lib/datetime";
+import {
+  formatDigestInstant,
+  formatWallTime12h,
+  buildTimezoneOptions,
+  isValidTimezone,
+} from "../lib/datetime";
 
 function browserTimezone(): string {
   try {
@@ -56,6 +62,12 @@ export default function SettingsPage(): ReactNode {
     return options;
   }, [timezones, digestTimezone]);
   const timezoneValid = frequency !== "daily" || isValidTimezone(digestTimezone.trim());
+  // Banner preview, rendered in the digest zone (same instant as the
+  // API's nextDigestAt, mockup format). Null hides the sentence.
+  const nextDigestLine =
+    frequency === "daily" && nextDigestAt
+      ? formatDigestInstant(new Date(nextDigestAt), digestTimezone)
+      : null;
 
   const load = useCallback(async () => {
     try {
@@ -130,7 +142,7 @@ export default function SettingsPage(): ReactNode {
         <div className="card">
           <h2>Notifications</h2>
           <p className="desc">How often Anveshan emails you about watched changes.</p>
-          <label className="row">
+          <label className="field">
             Frequency
             <select
               value={frequency}
@@ -144,50 +156,86 @@ export default function SettingsPage(): ReactNode {
           </label>
           {frequency === "daily" ? (
             <>
-              <label className="row">
-                Digest time
-                <input
-                  type="time"
-                  value={digestTime}
-                  onChange={(e) => setDigestTime(e.target.value)}
-                />
-              </label>
-              <label className="row">
-                Timezone
-                <TimezonePicker
-                  value={digestTimezone}
-                  options={timezoneOptions}
-                  onChange={setDigestTimezone}
-                />
-              </label>
+              <div className="field-grid">
+                <label className="field">
+                  Digest time
+                  <input
+                    type="time"
+                    value={digestTime}
+                    onChange={(e) => setDigestTime(e.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  Timezone
+                  <TimezonePicker
+                    value={digestTimezone}
+                    options={timezoneOptions}
+                    onChange={setDigestTimezone}
+                  />
+                </label>
+              </div>
               {!timezoneValid ? (
                 <p className="error">Unknown timezone — pick one from the list.</p>
               ) : null}
-              <p className="desc">
-                One email per day covering the 24 hours before {digestTime} (
-                {digestTimezone}
-                ).
-                {nextDigestAt ? <> Next digest: {formatDateTime(nextDigestAt)}.</> : null}
-              </p>
+              <div className="info-box">
+                <svg
+                  className="info-icon"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  aria-hidden="true"
+                >
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="7"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <line
+                    x1="8"
+                    y1="7.5"
+                    x2="8"
+                    y2="11"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="8" cy="5" r="1" fill="currentColor" />
+                </svg>
+                <p>
+                  You&apos;ll get one email per day at{" "}
+                  {formatWallTime12h(digestTime) ?? digestTime} ({digestTimezone}),
+                  covering the previous 24 hours.
+                  {nextDigestLine ? <> Next digest: {nextDigestLine}.</> : null}
+                </p>
+              </div>
             </>
           ) : null}
-          <label className="row">
-            <input
-              type="checkbox"
+          <div className="toggle-row">
+            <div>
+              <div className="toggle-title">Notify me of new programs</div>
+              <div className="toggle-sub">Get an email when a new program is added.</div>
+            </div>
+            <Toggle
               checked={watchNew}
-              onChange={(e) => setWatchNew(e.target.checked)}
+              label="Notify me of new programs"
+              onChange={setWatchNew}
             />
-            Notify me of new programs
-          </label>
-          <label className="row">
-            <input
-              type="checkbox"
+          </div>
+          <div className="toggle-row">
+            <div>
+              <div className="toggle-title">Watch all programs (asset changes)</div>
+              <div className="toggle-sub">Track asset changes across every program.</div>
+            </div>
+            <Toggle
               checked={watchAll}
-              onChange={(e) => setWatchAll(e.target.checked)}
+              label="Watch all programs (asset changes)"
+              onChange={setWatchAll}
             />
-            Watch all programs (asset changes)
-          </label>
-          <p>
+          </div>
+          <p className="actions">
             <button
               type="button"
               className="primary"

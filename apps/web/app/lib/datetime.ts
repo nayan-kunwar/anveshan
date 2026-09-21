@@ -125,6 +125,51 @@ function offsetLabel(offsetMinutes: number): string {
   return `UTC${sign}${Math.floor(abs / 60)}:${String(abs % 60).padStart(2, "0")}`;
 }
 
+/** Exact numeric offset of a zone at an instant ("UTC+5:30"). Null when unresolvable. */
+export function utcOffsetLabel(timeZone: string, now: Date = new Date()): string | null {
+  const offset = offsetMinutesAt(timeZone, now);
+  return offset === null ? null : offsetLabel(offset);
+}
+
+/** "09:00" -> "9:00 AM". Null on malformed input. */
+export function formatWallTime12h(timeLocal: string): string | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(timeLocal.trim());
+  if (!match) return null;
+  const hour24 = Number(match[1]);
+  const suffix = hour24 < 12 ? "AM" : "PM";
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${hour12}:${match[2]} ${suffix}`;
+}
+
+/**
+ * Render an instant inside a zone like the digest banner:
+ * "Tue, Sep 22 · 9:00 AM GMT+5:30". Null on invalid zones.
+ */
+export function formatDigestInstant(instant: Date, timeZone: string): string | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZoneName: "shortOffset",
+    }).formatToParts(instant);
+    const get = (type: string): string => parts.find((p) => p.type === type)?.value ?? "";
+    const weekday = get("weekday");
+    const month = get("month");
+    const day = get("day");
+    const time = `${get("hour")}:${get("minute")} ${get("dayPeriod")}`;
+    const zone = get("timeZoneName");
+    if (!weekday || !month || !day || !zone) return null;
+    return `${weekday}, ${month} ${day} · ${time} ${zone}`;
+  } catch {
+    return null;
+  }
+}
+
 /** DST face for a curated zone: standard is the smaller January/July offset. */
 function curatedAbbreviation(meta: CuratedZone, timeZone: string, now: Date): string {
   if (!meta.dst) return meta.std;
