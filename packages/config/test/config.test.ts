@@ -70,7 +70,7 @@ describe("loadConfig", () => {
     const config = loadConfig({ ...baseEnv });
     expect(config.NOTIFICATIONS_ENABLED).toBe(false);
     expect(config.AUTH_EMAIL_ENABLED).toBeUndefined();
-    expect(config.DAILY_DIGEST_CRON).toBe("0 8 * * *");
+    expect(config.DIGEST_TICK_CRON).toBe("* * * * *");
     expect(config.IMMEDIATE_EMAIL_CAP).toBe(20);
     expect(config.ASSET_EMAIL_CAP).toBe(10);
     expect(config.FRONTEND_URL).toBe("http://localhost:3001");

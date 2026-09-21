@@ -1,4 +1,4 @@
-import { createFakeSendMail } from "@anveshan/notifications";
+import { createFakeSendMail, lastClose } from "@anveshan/notifications";
 import type { MailMessage } from "@anveshan/notifications";
 import { eq, sql } from "drizzle-orm";
 import {
@@ -27,11 +27,8 @@ import { createLogger } from "../src/logger.js";
 import {
   catchUpDailyDigest,
   catchUpImmediate,
-  closedDigestDates,
-  digestDateString,
-  digestWindow,
   enqueueAfterCollection,
-  enqueueDailyDigest,
+  enqueueDueDigests,
   enqueueImmediate,
   filterChanges,
 } from "../src/notifications/enqueue.js";
@@ -116,6 +113,8 @@ async function makeUser(
     frequency: "immediate" | "daily";
     watchNewPrograms: boolean;
     watchAllPrograms: boolean;
+    digestTimezone?: string;
+    digestTimeLocal?: string;
   },
   opts: { verified?: boolean; watches?: string[] } = {},
 ): Promise<TestUser> {
@@ -261,17 +260,104 @@ describe("filterChanges matrix", () => {
   });
 });
 
-describe("closedDigestDates", () => {
-  it("after 08:00 UTC covers today + yesterday", () => {
-    expect(
-      closedDigestDates(new Date("2026-09-18T09:00:00Z")).map(digestDateString),
-    ).toEqual(["2026-09-18", "2026-09-17"]);
+describe("enqueueDueDigests", () => {
+  it("enqueues only users whose personal close just passed, once", async () => {
+    if (!db) return;
+    const { db: database, config: cfg } = needDeps();
+    const deps = { db: database, config: cfg, logger: logger() };
+    const programId = await makeProgram("digestprog");
+    // Fixed `now` for the whole test: no minute-boundary flake.
+    const now = new Date();
+    const duePref = {
+      digestTimezone: "UTC",
+      digestTimeLocal: `${String(now.getUTCHours()).padStart(2, "0")}:${String(
+        now.getUTCMinutes(),
+      ).padStart(2, "0")}`,
+    };
+    const later = new Date(now.getTime() + 2 * 3_600_000);
+    const notDuePref = {
+      digestTimezone: "UTC",
+      digestTimeLocal: `${String(later.getUTCHours()).padStart(2, "0")}:${String(
+        later.getUTCMinutes(),
+      ).padStart(2, "0")}`,
+    };
+    const due = await makeUser(
+      "digest-a@example.com",
+      {
+        frequency: "daily",
+        watchNewPrograms: false,
+        watchAllPrograms: false,
+        ...duePref,
+      },
+      { watches: [programId] },
+    );
+    const notDue = await makeUser(
+      "digest-b@example.com",
+      {
+        frequency: "daily",
+        watchNewPrograms: false,
+        watchAllPrograms: false,
+        ...notDuePref,
+      },
+      { watches: [programId] },
+    );
+    const runId = await makeRunWithChanges(programId, ["ASSET_ADDED"]);
+    // Backdate the change into the due user's window (deterministic hourly).
+    const close = lastClose(now, duePref.digestTimezone, duePref.digestTimeLocal);
+    if (!close) throw new Error("no closed digest window");
+    await database.execute(sql`
+      UPDATE changes SET detected_at = ${new Date(close.getTime() - 3_600_000)}
+      WHERE collection_run_id = ${runId}`);
+    expect(await enqueueDueDigests(deps, now)).toBeGreaterThanOrEqual(1);
+    expect(await enqueueDueDigests(deps, now)).toBe(0);
+    expect(await deliveriesFor(due.userId)).toEqual(["pending"]);
+    expect(await deliveriesFor(notDue.userId)).toEqual([]);
   });
 
-  it("before 08:00 UTC covers yesterday + the day before", () => {
-    expect(
-      closedDigestDates(new Date("2026-09-18T07:00:00Z")).map(digestDateString),
-    ).toEqual(["2026-09-17", "2026-09-16"]);
+  it("drains a pinned-close digest into real mail", async () => {
+    if (!db) return;
+    const { db: database, config: cfg } = needDeps();
+    const deps = { db: database, config: cfg, logger: logger() };
+    const programId = await makeProgram("digestmail");
+    const now = new Date();
+    const user = await makeUser(
+      "digest-c@example.com",
+      {
+        frequency: "daily",
+        watchNewPrograms: false,
+        watchAllPrograms: false,
+        digestTimezone: "UTC",
+        digestTimeLocal: `${String(now.getUTCHours()).padStart(2, "0")}:${String(
+          now.getUTCMinutes(),
+        ).padStart(2, "0")}`,
+      },
+      { watches: [programId] },
+    );
+    const runId = await makeRunWithChanges(programId, ["ASSET_ADDED"]);
+    const close = lastClose(
+      now,
+      "UTC",
+      `${String(now.getUTCHours()).padStart(2, "0")}:${String(
+        now.getUTCMinutes(),
+      ).padStart(2, "0")}`,
+    );
+    if (!close) throw new Error("no closed digest window");
+    await database.execute(sql`
+      UPDATE changes SET detected_at = ${new Date(close.getTime() - 3_600_000)}
+      WHERE collection_run_id = ${runId}`);
+    expect(await enqueueDueDigests(deps, now)).toBeGreaterThanOrEqual(1);
+    const worker = createDeliveryWorker({
+      db: database,
+      config: cfg,
+      logger: logger(),
+      sendMail: createFakeSendMail(sent),
+    });
+    const result = await worker.drain();
+    expect(result.sent).toBeGreaterThanOrEqual(1);
+    const mail = mailTo(user.email);
+    expect(mail).toHaveLength(1);
+    expect(mail[0]?.subject).toContain("Daily digest");
+    expect(await deliveriesFor(user.userId)).toEqual(["sent"]);
   });
 });
 
@@ -346,31 +432,6 @@ async function findUser(database: Database, email: string) {
   if (!user) throw new Error(`missing user ${email}`);
   return user;
 }
-
-describe("enqueueDailyDigest", () => {
-  it("enqueues the current window once", async () => {
-    if (!db) return;
-    const { db: database, config: cfg } = needDeps();
-    const deps = { db: database, config: cfg, logger: logger() };
-    const programId = await makeProgram("digestprog");
-    await makeUser("digest-a@example.com", {
-      frequency: "daily",
-      watchNewPrograms: false,
-      watchAllPrograms: true,
-    });
-    const runId = await makeRunWithChanges(programId, ["ASSET_ADDED"]);
-    // Backdate the change into a known closed window (deterministic at any hour).
-    const digestOn = closedDigestDates(new Date())[0]!;
-    const { windowStart } = digestWindow(digestOn);
-    await database.execute(sql`
-      UPDATE changes SET detected_at = ${new Date(windowStart.getTime() + 3_600_000)}
-      WHERE collection_run_id = ${runId}`);
-    expect(await enqueueDailyDigest(deps, digestOn)).toBeGreaterThanOrEqual(1);
-    expect(await enqueueDailyDigest(deps, digestOn)).toBe(0);
-    const u = await findUser(database, "digest-a@example.com");
-    expect((await deliveriesFor(u.id)).length).toBeGreaterThanOrEqual(1);
-  });
-});
 
 describe("enqueueAfterCollection", () => {
   it("no-ops on failed, zero-change, or disabled runs without touching the db", async () => {
@@ -457,25 +518,32 @@ describe("catch-up", () => {
     expect(runId).toBeDefined();
   });
 
-  it("catchUpDailyDigest enqueues today's digest when missing", async () => {
+  it("catchUpDailyDigest enqueues the user's last closes when missing", async () => {
     if (!db) return;
     const { db: database, config: cfg } = needDeps();
     const deps = { db: database, config: cfg, logger: logger() };
     const programId = await makeProgram("catchup-daily");
-    await makeUser("catchup-d@example.com", {
-      frequency: "daily",
-      watchNewPrograms: false,
-      watchAllPrograms: true,
-    });
+    await makeUser(
+      "catchup-d@example.com",
+      {
+        frequency: "daily",
+        watchNewPrograms: false,
+        watchAllPrograms: false,
+        digestTimezone: "UTC",
+        digestTimeLocal: "08:00",
+      },
+      { watches: [programId] },
+    );
     const runId = await makeRunWithChanges(programId, ["ASSET_ADDED"]);
-    // Backdate into the most recently closed window so catch-up must cover it.
-    const digestOn = closedDigestDates(new Date())[0]!;
-    const { windowStart } = digestWindow(digestOn);
+    // Backdate into the user's most recently closed window (any hour).
+    const now = new Date();
+    const close = lastClose(now, "UTC", "08:00");
+    if (!close) throw new Error("no closed digest window");
     await database.execute(sql`
-      UPDATE changes SET detected_at = ${new Date(windowStart.getTime() + 3_600_000)}
+      UPDATE changes SET detected_at = ${new Date(close.getTime() - 3_600_000)}
       WHERE collection_run_id = ${runId}`);
-    const first = await catchUpDailyDigest(deps, new Date());
-    const second = await catchUpDailyDigest(deps, new Date());
+    const first = await catchUpDailyDigest(deps, now);
+    const second = await catchUpDailyDigest(deps, now);
     expect(first).toBeGreaterThanOrEqual(1);
     expect(second).toBe(0);
   });

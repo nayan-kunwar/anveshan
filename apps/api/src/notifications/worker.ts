@@ -22,8 +22,7 @@ import cron from "node-cron";
 import {
   catchUpDailyDigest,
   catchUpImmediate,
-  digestWindow,
-  enqueueDailyDigest,
+  enqueueDueDigests,
   filterChanges,
 } from "./enqueue.js";
 
@@ -57,12 +56,29 @@ function toTemplateChanges(
   }));
 }
 
-function digestWindowFromString(digestOn: string): {
+/**
+ * Legacy window for rows enqueued before per-user digests existed
+ * (digest_close_at NULL): digest_on's 08:00 UTC close. New rows always
+ * pin the exact close instant, so enqueue and send agree by construction.
+ */
+function legacyDigestWindow(digestOn: string): {
   windowStart: Date;
   windowEnd: Date;
 } {
   const [y, m, d] = digestOn.split("-").map(Number);
-  return digestWindow(new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1)));
+  const windowEnd = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1) + 8 * 3_600_000);
+  return { windowStart: new Date(windowEnd.getTime() - 24 * 3_600_000), windowEnd };
+}
+
+function digestWindowForDelivery(delivery: DeliveryRow): {
+  windowStart: Date;
+  windowEnd: Date;
+} {
+  if (delivery.digestCloseAt) {
+    const windowEnd = new Date(delivery.digestCloseAt);
+    return { windowStart: new Date(windowEnd.getTime() - 24 * 3_600_000), windowEnd };
+  }
+  return legacyDigestWindow(delivery.digestOn ?? "1970-01-01");
 }
 
 /**
@@ -78,12 +94,12 @@ async function sendOneDelivery(deps: WorkerDeps, delivery: DeliveryRow): Promise
       return "skipped";
     }
     let changes;
+    let windowStart: Date | undefined;
+    let windowEnd: Date | undefined;
     if (delivery.kind === "immediate") {
       changes = await findChangesByRun(deps.db, delivery.collectionRunId ?? "");
     } else {
-      const { windowStart, windowEnd } = digestWindowFromString(
-        delivery.digestOn ?? "1970-01-01",
-      );
+      ({ windowStart, windowEnd } = digestWindowForDelivery(delivery));
       changes = await findChangesInWindow(deps.db, windowStart, windowEnd);
     }
     const sub = await findSubscription(deps.db, user.id);
@@ -115,12 +131,9 @@ async function sendOneDelivery(deps: WorkerDeps, delivery: DeliveryRow): Promise
       assetCap: deps.config.ASSET_EMAIL_CAP,
     };
     const mail =
-      delivery.kind === "immediate"
+      delivery.kind === "immediate" || !windowStart || !windowEnd
         ? renderImmediate(template, base)
-        : renderDaily(template, {
-            ...base,
-            ...digestWindowFromString(delivery.digestOn ?? "1970-01-01"),
-          });
+        : renderDaily(template, { ...base, windowStart, windowEnd });
     await deps.sendMail({ to: user.email, subject: mail.subject, text: mail.text });
     await markDeliverySent(deps.db, delivery.id);
     return "sent";
@@ -196,8 +209,9 @@ export interface DigestCronDeps {
 }
 
 /**
- * Daily 08:00 UTC digest cron. No-op when disabled. Returns the task,
- * or null when disabled (same convention as the collection scheduler).
+ * Per-minute digest tick. Enqueues digests for daily users whose personal
+ * close just passed. No-op when disabled. Returns the task, or null when
+ * disabled (same convention as the collection scheduler).
  */
 export function startDigestCron(deps: DigestCronDeps): cron.ScheduledTask | null {
   const { config, logger } = deps;
@@ -205,24 +219,19 @@ export function startDigestCron(deps: DigestCronDeps): cron.ScheduledTask | null
     logger.info("digest cron disabled (NOTIFICATIONS_ENABLED=false)");
     return null;
   }
-  if (!cron.validate(config.DAILY_DIGEST_CRON)) {
-    throw new Error(`Invalid DAILY_DIGEST_CRON expression: ${config.DAILY_DIGEST_CRON}`);
+  if (!cron.validate(config.DIGEST_TICK_CRON)) {
+    throw new Error(`Invalid DIGEST_TICK_CRON expression: ${config.DIGEST_TICK_CRON}`);
   }
   const task = cron.schedule(
-    config.DAILY_DIGEST_CRON,
+    config.DIGEST_TICK_CRON,
     () => {
       void (async () => {
         try {
-          const now = new Date();
-          const midnight = Date.UTC(
-            now.getUTCFullYear(),
-            now.getUTCMonth(),
-            now.getUTCDate(),
-          );
-          await enqueueDailyDigest(
-            { db: deps.db, config: deps.config, logger: deps.logger },
-            new Date(midnight),
-          );
+          await enqueueDueDigests({
+            db: deps.db,
+            config: deps.config,
+            logger: deps.logger,
+          });
         } catch (error) {
           logger.error({ err: error }, "digest enqueue crashed");
         }
@@ -230,7 +239,7 @@ export function startDigestCron(deps: DigestCronDeps): cron.ScheduledTask | null
     },
     { timezone: "UTC" },
   );
-  logger.info({ cron: config.DAILY_DIGEST_CRON }, "digest cron started");
+  logger.info({ cron: config.DIGEST_TICK_CRON }, "digest cron started");
   return task;
 }
 

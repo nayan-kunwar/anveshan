@@ -55,6 +55,10 @@ export const envSchema = z.object({
   NOTIFICATIONS_ENABLED: booleanFromString.default(false),
   AUTH_EMAIL_ENABLED: booleanFromString.optional(),
   DAILY_DIGEST_CRON: z.string().min(1).default("0 8 * * *"),
+  // Per-minute tick that enqueues digests for users whose personal close
+  // just passed. Digest times live per-user in subscriptions
+  // (digest_timezone + digest_time_local).
+  DIGEST_TICK_CRON: z.string().min(1).default("* * * * *"),
   IMMEDIATE_EMAIL_CAP: z.coerce.number().int().positive().default(20),
   ASSET_EMAIL_CAP: z.coerce.number().int().positive().default(10),
 });

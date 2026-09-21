@@ -13,18 +13,14 @@ import {
   programs,
   upsertAsset,
   upsertProgram,
+  upsertSubscription,
 } from "@anveshan/database";
 import { createMailTransport, createSendMail } from "@anveshan/notifications";
+import { lastClose } from "@anveshan/notifications";
 import { and, eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { createLogger } from "./logger.js";
-import {
-  closedDigestDates,
-  digestDateString,
-  digestWindow,
-  enqueueDailyDigest,
-  enqueueImmediate,
-} from "./notifications/enqueue.js";
+import { enqueueDueDigests, enqueueImmediate } from "./notifications/enqueue.js";
 import { createDeliveryWorker } from "./notifications/worker.js";
 
 /**
@@ -217,13 +213,13 @@ async function main(): Promise<void> {
         assetsRemoved: 0,
       });
       if (sub.frequency === "immediate") {
-        const digestOn = closedDigestDates(new Date())[0];
-        if (!digestOn) throw new Error("no closed digest date");
-        const { windowStart } = digestWindow(digestOn);
+        const now = new Date();
+        const close = lastClose(now, sub.digestTimezone, sub.digestTimeLocal);
+        if (!close) throw new Error("no closed digest window");
         await db.execute(sql`
-          UPDATE changes SET detected_at = ${new Date(windowStart.getTime() + 3_600_000)}
+          UPDATE changes SET detected_at = ${new Date(close.getTime() - 3_600_000)}
           WHERE collection_run_id = ${run.id}`);
-        await enqueueDailyDigest({ db, config, logger }, digestOn);
+        await enqueueDueDigests({ db, config, logger }, now);
         const result = await worker.drain();
         const rows = await db
           .select({ id: notificationDeliveries.id })
@@ -231,7 +227,7 @@ async function main(): Promise<void> {
           .where(
             and(
               eq(notificationDeliveries.userId, user.id),
-              eq(notificationDeliveries.digestOn, digestDateString(digestOn)),
+              eq(notificationDeliveries.kind, "daily"),
             ),
           );
         process.stdout.write(
@@ -354,13 +350,24 @@ async function main(): Promise<void> {
         throw new Error("no sent delivery for target — check status/last_error");
       }
     } else {
-      const digestOn = closedDigestDates(new Date())[0];
-      if (!digestOn) throw new Error("no closed digest date");
-      const { windowStart } = digestWindow(digestOn);
+      // Align the target's digest close to right now so the per-minute
+      // tick fires deterministically at any hour.
+      const now = new Date();
+      const hh = String(now.getUTCHours()).padStart(2, "0");
+      const mi = String(now.getUTCMinutes()).padStart(2, "0");
+      await upsertSubscription(db, user.id, {
+        frequency: opts.cadence,
+        watchNewPrograms: sub.watchNewPrograms,
+        watchAllPrograms: sub.watchAllPrograms,
+        digestTimezone: "UTC",
+        digestTimeLocal: `${hh}:${mi}`,
+      });
+      const close = lastClose(now, "UTC", `${hh}:${mi}`);
+      if (!close) throw new Error("no closed digest window");
       await db.execute(sql`
-        UPDATE changes SET detected_at = ${new Date(windowStart.getTime() + 3_600_000)}
+        UPDATE changes SET detected_at = ${new Date(close.getTime() - 3_600_000)}
         WHERE collection_run_id = ${run.id}`);
-      const enqueued = await enqueueDailyDigest({ db, config, logger }, digestOn);
+      const enqueued = await enqueueDueDigests({ db, config, logger }, now);
       const result = await worker.drain();
       const rows = await db
         .select({ status: notificationDeliveries.status })
@@ -368,11 +375,11 @@ async function main(): Promise<void> {
         .where(
           and(
             eq(notificationDeliveries.userId, user.id),
-            eq(notificationDeliveries.digestOn, digestDateString(digestOn)),
+            eq(notificationDeliveries.kind, "daily"),
           ),
         );
       process.stdout.write(
-        `run: ${run.id}\ndigest_on: ${digestDateString(digestOn)}\nprogram: ${program.id} (${opts.handle})\nenqueued: ${enqueued}\nclaimed: ${result.claimed} sent: ${result.sent} skipped: ${result.skipped}\ndeliveries for target: ${JSON.stringify(rows.map((r) => r.status))}\n`,
+        `run: ${run.id}\nclose: ${close.toISOString()}\nprogram: ${program.id} (${opts.handle})\nenqueued: ${enqueued}\nclaimed: ${result.claimed} sent: ${result.sent} skipped: ${result.skipped}\ndeliveries for target: ${JSON.stringify(rows.map((r) => r.status))}\n`,
       );
       if (!rows.some((r) => r.status === "sent")) {
         throw new Error("no sent digest for target — check status/last_error");
