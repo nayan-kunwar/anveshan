@@ -8,12 +8,7 @@ import type { Subscription, User } from "../lib/api";
 import Sidebar from "../components/Sidebar";
 import TimezonePicker from "../components/TimezonePicker";
 import Topbar from "../components/Topbar";
-import {
-  formatDateTime,
-  convertWallTime,
-  buildTimezoneOptions,
-  isValidTimezone,
-} from "../lib/datetime";
+import { formatDateTime, buildTimezoneOptions, isValidTimezone } from "../lib/datetime";
 
 function browserTimezone(): string {
   try {
@@ -50,12 +45,10 @@ export default function SettingsPage(): ReactNode {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
-
   const timezones = useMemo(() => availableTimezones(), []);
-  const browserTz = useMemo(() => browserTimezone(), []);
-  // Searchable picker: curated majors first so zones like Asia/Kolkata
-  // stay findable even when the browser's enumeration omits them. The
-  // stored value is always appended (legacy spellings keep working).
+  // Curated majors first so zones like Asia/Kolkata stay findable even
+  // when the browser's enumeration omits them. The stored value is
+  // always appended (legacy spellings keep working).
   const timezoneOptions = useMemo(() => {
     const options = buildTimezoneOptions(timezones);
     const current = digestTimezone.trim();
@@ -63,17 +56,6 @@ export default function SettingsPage(): ReactNode {
     return options;
   }, [timezones, digestTimezone]);
   const timezoneValid = frequency !== "daily" || isValidTimezone(digestTimezone.trim());
-
-  // Guardrail: the typed time is interpreted in the selected zone, not
-  // the viewer's zone. Spell out the local equivalent on mismatch so a
-  // "my time vs UTC" mix-up is visible before Save.
-  const localHint = useMemo(() => {
-    if (frequency !== "daily") return null;
-    if (!digestTimezone || digestTimezone === browserTz) return null;
-    const converted = convertWallTime(digestTime, digestTimezone);
-    if (!converted) return null;
-    return `That's ${converted} your time (${browserTz}) — double-check the timezone.`;
-  }, [frequency, digestTimezone, digestTime, browserTz]);
 
   const load = useCallback(async () => {
     try {
@@ -187,7 +169,6 @@ export default function SettingsPage(): ReactNode {
                 ).
                 {nextDigestAt ? <> Next digest: {formatDateTime(nextDigestAt)}.</> : null}
               </p>
-              {localHint ? <p className="desc">{localHint}</p> : null}
             </>
           ) : null}
           <label className="row">
