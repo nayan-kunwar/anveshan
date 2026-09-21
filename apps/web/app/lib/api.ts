@@ -148,3 +148,58 @@ export async function listAllPrograms(): Promise<Program[]> {
   }
   return all;
 }
+
+export function getProgram(id: string): Promise<{ data: Program }> {
+  return api<{ data: Program }>(`/api/v1/programs/${id}`);
+}
+
+export interface Asset {
+  id: string;
+  identifier: string;
+  type: string;
+  scope: string;
+}
+
+export interface Change {
+  id: string;
+  type: string;
+  programId: string;
+  assetId: string | null;
+  assetIdentifier: string | null;
+  collectionRunId: string;
+  detectedAt: string;
+}
+
+interface AssetPage {
+  data: Asset[];
+  pagination: { page: number; pageSize: number; total: number };
+}
+
+interface ChangePage {
+  data: Change[];
+  pagination: { page: number; pageSize: number; total: number };
+}
+
+export function listAssets(
+  id: string,
+  opts: { scope?: "ALL" | "IN" | "OUT"; page?: number; pageSize?: number } = {},
+): Promise<AssetPage> {
+  const params = new URLSearchParams({
+    scope: opts.scope ?? "IN",
+    page: String(opts.page ?? 1),
+    pageSize: String(opts.pageSize ?? 25),
+  });
+  return api<AssetPage>(`/api/v1/programs/${id}/assets?${params.toString()}`);
+}
+
+export function listChanges(
+  id: string,
+  opts: { since?: string | undefined; page?: number; pageSize?: number } = {},
+): Promise<ChangePage> {
+  const params = new URLSearchParams({
+    page: String(opts.page ?? 1),
+    pageSize: String(opts.pageSize ?? 25),
+  });
+  if (opts.since) params.set("since", opts.since);
+  return api<ChangePage>(`/api/v1/programs/${id}/changes?${params.toString()}`);
+}

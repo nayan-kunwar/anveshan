@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
@@ -174,7 +175,8 @@ export default function DashboardPage(): ReactNode {
               {matches.map((p) => (
                 <li key={p.id}>
                   <span>
-                    {p.name} <span className="small">({p.externalId})</span>
+                    <Link href={`/programs/${p.id}`}>{p.name}</Link>{" "}
+                    <span className="small">({p.externalId})</span>
                   </span>
                   <button type="button" onClick={() => void onAddWatch(p.id)}>
                     Watch
@@ -244,7 +246,8 @@ export default function DashboardPage(): ReactNode {
               {watches.map((w) => (
                 <li key={w.programId}>
                   <span>
-                    {w.name} <span className="small">({w.externalId})</span>
+                    <Link href={`/programs/${w.programId}`}>{w.name}</Link>{" "}
+                    <span className="small">({w.externalId})</span>
                   </span>
                   <button type="button" onClick={() => void onRemoveWatch(w.programId)}>
                     Remove

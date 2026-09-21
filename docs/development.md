@@ -90,6 +90,16 @@ audit). Without `--yes` it dry-runs. Daily/negative runs complete with
 zero counters so immediate catch-up skips them. Never use in production
 (script refuses `NODE_ENV=production`).
 
+## Program detail page
+
+`apps/web/app/programs/[id]/page.tsx` (public, no login required):
+program header + watch/unwatch, assets (scope tabs ALL/IN/OUT,
+default IN, 25/page), changes (7d/24h/all presets, newest first,
+25/page). Consumes the existing `GET /programs/:id`, `:id/assets`,
+`:id/changes` endpoints — no API changes. Dashboard watched + search
+lists link here. Unknown/bad ids render a not-found card
+(`PROGRAM_NOT_FOUND` / `BAD_REQUEST`).
+
 ## Test split
 
 - `pnpm test`: no network. Fixtures in
