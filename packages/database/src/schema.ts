@@ -8,6 +8,7 @@ import {
   pgTable,
   primaryKey,
   text,
+  time,
   timestamp,
   uniqueIndex,
   uuid,
@@ -176,6 +177,9 @@ export type NewChangeRow = typeof changes.$inferInsert;
  *   No row (or unsubscribed_at set) means "send nothing".
  * - Empty `watches` + watch_all_programs=false means "send nothing".
  *   PROGRAM_ADDED needs the separate watch_new_programs flag.
+ * - `digest_timezone` (IANA) + `digest_time_local` (wall-clock HH:MM) are
+ *   the user's daily close: the digest covers [close-24h, close).
+ *   Defaults ('UTC', '08:00') preserve the old global 08:00 UTC digest.
  */
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -230,6 +234,8 @@ export const subscriptions = pgTable(
     frequency: text("frequency").notNull(),
     watchNewPrograms: boolean("watch_new_programs").notNull().default(false),
     watchAllPrograms: boolean("watch_all_programs").notNull().default(false),
+    digestTimezone: text("digest_timezone").notNull().default("UTC"),
+    digestTimeLocal: time("digest_time_local").notNull().default("08:00"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -268,6 +274,11 @@ export const notificationDeliveries = pgTable(
       onDelete: "cascade",
     }),
     digestOn: date("digest_on"),
+    // Exact close instant this digest covers ([close-24h, close)).
+    // NULL only for rows enqueued before per-user digests existed —
+    // the worker falls back to the legacy digest_on 08:00 UTC window.
+    // New daily rows always set it.
+    digestCloseAt: timestamp("digest_close_at", { withTimezone: true }),
     status: text("status").notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
@@ -289,11 +300,14 @@ export const notificationDeliveries = pgTable(
     ),
     // Partial uniques (NULL-safe). Enqueue uses index inference
     // (target + where), never ON CONSTRAINT — see docs/notification-design.md.
+    // Daily uniqueness is on the exact close instant, not the calendar
+    // date: on a 23-hour DST day two closes can share one UTC date.
+    // NULL close_at rows (pre-per-user digests) never conflict.
     uniqueIndex("deliveries_immediate_uq")
       .on(t.userId, t.collectionRunId, t.channel)
       .where(sql`${t.kind} = 'immediate'`),
     uniqueIndex("deliveries_daily_uq")
-      .on(t.userId, t.digestOn, t.channel)
+      .on(t.userId, t.digestCloseAt, t.channel)
       .where(sql`${t.kind} = 'daily'`),
     index("deliveries_worker_idx")
       .on(t.status, t.nextAttemptAt, t.createdAt)

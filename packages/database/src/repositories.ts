@@ -492,6 +492,10 @@ export interface UpsertSubscriptionInput {
   frequency: "immediate" | "daily";
   watchNewPrograms: boolean;
   watchAllPrograms: boolean;
+  /** IANA timezone for the daily close. Omitted = leave stored value. */
+  digestTimezone?: string | undefined;
+  /** Wall-clock "HH:MM" daily close. Omitted = leave stored value. */
+  digestTimeLocal?: string | undefined;
 }
 
 export async function upsertSubscription(
@@ -499,12 +503,27 @@ export async function upsertSubscription(
   userId: string,
   input: UpsertSubscriptionInput,
 ): Promise<SubscriptionRow> {
+  const patch: {
+    frequency: "immediate" | "daily";
+    watchNewPrograms: boolean;
+    watchAllPrograms: boolean;
+    digestTimezone?: string;
+    digestTimeLocal?: string;
+    updatedAt: Date;
+  } = {
+    frequency: input.frequency,
+    watchNewPrograms: input.watchNewPrograms,
+    watchAllPrograms: input.watchAllPrograms,
+    updatedAt: new Date(),
+  };
+  if (input.digestTimezone !== undefined) patch.digestTimezone = input.digestTimezone;
+  if (input.digestTimeLocal !== undefined) patch.digestTimeLocal = input.digestTimeLocal;
   const rows = await db
     .insert(subscriptions)
-    .values({ userId, ...input, updatedAt: new Date() })
+    .values({ userId, ...patch, updatedAt: new Date() })
     .onConflictDoUpdate({
       target: subscriptions.userId,
-      set: { ...input, updatedAt: new Date() },
+      set: { ...patch, updatedAt: new Date() },
     })
     .returning();
   const row = rows[0];
@@ -632,6 +651,8 @@ export interface EligibleUser {
   frequency: string;
   watchNewPrograms: boolean;
   watchAllPrograms: boolean;
+  digestTimezone: string;
+  digestTimeLocal: string;
 }
 
 /** Verified, subscribed, not globally unsubscribed — for one cadence. */
@@ -646,6 +667,8 @@ export async function findEligibleUsers(
       frequency: subscriptions.frequency,
       watchNewPrograms: subscriptions.watchNewPrograms,
       watchAllPrograms: subscriptions.watchAllPrograms,
+      digestTimezone: subscriptions.digestTimezone,
+      digestTimeLocal: subscriptions.digestTimeLocal,
     })
     .from(users)
     .innerJoin(subscriptions, eq(subscriptions.userId, users.id))
@@ -700,18 +723,24 @@ export async function enqueueImmediateDelivery(
   return rows.length > 0;
 }
 
+/**
+ * Idempotent enqueue: second call for the same close instant inserts
+ * nothing. Uniqueness is on (user, close instant), not the calendar
+ * date — on a 23-hour DST day two closes can share one UTC date.
+ */
 export async function enqueueDailyDelivery(
   db: Db,
   userId: string,
   digestOn: string,
+  digestCloseAt: Date,
 ): Promise<boolean> {
   const rows = await db
     .insert(notificationDeliveries)
-    .values({ userId, digestOn, channel: "email", kind: "daily" })
+    .values({ userId, digestOn, digestCloseAt, channel: "email", kind: "daily" })
     .onConflictDoNothing({
       target: [
         notificationDeliveries.userId,
-        notificationDeliveries.digestOn,
+        notificationDeliveries.digestCloseAt,
         notificationDeliveries.channel,
       ],
       where: sql`${notificationDeliveries.kind} = 'daily'`,
@@ -779,6 +808,7 @@ function mapDeliveryRow(r: Record<string, unknown>): DeliveryRow {
     kind: r["kind"] as string,
     collectionRunId: r["collection_run_id"] as string | null,
     digestOn: r["digest_on"] as string | null,
+    digestCloseAt: r["digest_close_at"] as Date | null,
     status: r["status"] as string,
     attempts: r["attempts"] as number,
     nextAttemptAt: r["next_attempt_at"] as Date | null,

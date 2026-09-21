@@ -187,6 +187,40 @@ describe("notification repositories", () => {
     expect(await findWatchProgramIds(needDb(), user.id)).toEqual([]);
   });
 
+  it("upsertSubscription defaults digest prefs and round-trips custom values", async () => {
+    if (!db) return;
+    const user = await upsertUserByEmail(needDb(), "digestpref@example.com");
+    await verifyUserEmail(needDb(), user.id);
+    const created = await upsertSubscription(needDb(), user.id, {
+      frequency: "daily",
+      watchNewPrograms: false,
+      watchAllPrograms: true,
+    });
+    expect(created.digestTimezone).toBe("UTC");
+    expect(created.digestTimeLocal).toBe("08:00:00");
+    const updated = await upsertSubscription(needDb(), user.id, {
+      frequency: "daily",
+      watchNewPrograms: false,
+      watchAllPrograms: true,
+      digestTimezone: "Asia/Kolkata",
+      digestTimeLocal: "13:30",
+    });
+    expect(updated.digestTimezone).toBe("Asia/Kolkata");
+    expect(updated.digestTimeLocal).toBe("13:30:00");
+    // Omitted digest fields leave stored values unchanged.
+    const kept = await upsertSubscription(needDb(), user.id, {
+      frequency: "immediate",
+      watchNewPrograms: false,
+      watchAllPrograms: true,
+    });
+    expect(kept.digestTimezone).toBe("Asia/Kolkata");
+    expect(kept.digestTimeLocal).toBe("13:30:00");
+    const eligible = await findEligibleUsers(needDb(), "immediate");
+    const row = eligible.find((u) => u.userId === user.id);
+    expect(row?.digestTimezone).toBe("Asia/Kolkata");
+    expect(row?.digestTimeLocal).toBe("13:30:00");
+  });
+
   it("findEligibleUsers filters by verified, subscribed, frequency", async () => {
     if (!db) return;
     const immediate = await upsertUserByEmail(needDb(), "elig-immediate@example.com");
@@ -238,12 +272,33 @@ describe("notification repositories", () => {
     expect(await enqueueImmediateDelivery(needDb(), user.id, run.id)).toBe(false);
   });
 
-  it("enqueueDailyDelivery is idempotent per digest_on", async () => {
+  it("enqueueDailyDelivery is idempotent per close instant", async () => {
     if (!db) return;
     const user = await upsertUserByEmail(needDb(), "idem-daily@example.com");
-    expect(await enqueueDailyDelivery(needDb(), user.id, "2026-09-18")).toBe(true);
-    expect(await enqueueDailyDelivery(needDb(), user.id, "2026-09-18")).toBe(false);
-    expect(await enqueueDailyDelivery(needDb(), user.id, "2026-09-19")).toBe(true);
+    const closeA = new Date("2026-09-18T08:00:00Z");
+    const closeB = new Date("2026-09-18T23:30:00Z");
+    expect(await enqueueDailyDelivery(needDb(), user.id, "2026-09-18", closeA)).toBe(
+      true,
+    );
+    expect(await enqueueDailyDelivery(needDb(), user.id, "2026-09-18", closeA)).toBe(
+      false,
+    );
+    // Same UTC date but a different close (23h DST day) is a new digest.
+    expect(await enqueueDailyDelivery(needDb(), user.id, "2026-09-18", closeB)).toBe(
+      true,
+    );
+    // Same close instant under a different date string is the same digest.
+    expect(await enqueueDailyDelivery(needDb(), user.id, "2026-09-19", closeA)).toBe(
+      false,
+    );
+    expect(
+      await enqueueDailyDelivery(
+        needDb(),
+        user.id,
+        "2026-09-19",
+        new Date("2026-09-19T08:00:00Z"),
+      ),
+    ).toBe(true);
   });
 
   it("claimDeliveries claims once; second claim is empty", async () => {
@@ -283,9 +338,24 @@ describe("notification repositories", () => {
     await enqueueImmediateDelivery(needDb(), user.id, run.id);
     const [claimed] = await claimDeliveries(needDb(), 50);
     await markDeliverySent(needDb(), claimed!.id);
-    await enqueueDailyDelivery(needDb(), user.id, "2026-09-18");
-    await enqueueDailyDelivery(needDb(), user.id, "2026-09-19");
-    await enqueueDailyDelivery(needDb(), user.id, "2026-09-20");
+    await enqueueDailyDelivery(
+      needDb(),
+      user.id,
+      "2026-09-18",
+      new Date("2026-09-18T08:00:00Z"),
+    );
+    await enqueueDailyDelivery(
+      needDb(),
+      user.id,
+      "2026-09-19",
+      new Date("2026-09-19T08:00:00Z"),
+    );
+    await enqueueDailyDelivery(
+      needDb(),
+      user.id,
+      "2026-09-20",
+      new Date("2026-09-20T08:00:00Z"),
+    );
     const batch = await claimDeliveries(needDb(), 50);
     expect(batch).toHaveLength(3);
     await markDeliverySkipped(needDb(), batch[0]!.id);
