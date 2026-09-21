@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { ApiError, getSubscription, logout, me, putSubscription } from "../lib/api";
 import type { Subscription, User } from "../lib/api";
 import Sidebar from "../components/Sidebar";
+import TimezonePicker from "../components/TimezonePicker";
 import Topbar from "../components/Topbar";
 import {
   formatDateTime,
@@ -171,17 +172,11 @@ export default function SettingsPage(): ReactNode {
               </label>
               <label className="row">
                 Timezone
-                <input
-                  list="tz-list"
+                <TimezonePicker
                   value={digestTimezone}
-                  placeholder="Type to search, e.g. Asia/Kolkata"
-                  onChange={(e) => setDigestTimezone(e.target.value)}
+                  options={timezoneOptions}
+                  onChange={setDigestTimezone}
                 />
-                <datalist id="tz-list">
-                  {timezoneOptions.map((tz) => (
-                    <option key={tz} value={tz} />
-                  ))}
-                </datalist>
               </label>
               {!timezoneValid ? (
                 <p className="error">Unknown timezone — pick one from the list.</p>

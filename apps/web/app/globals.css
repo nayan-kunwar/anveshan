@@ -265,6 +265,40 @@ label.row {
   gap: 0.5rem;
 }
 
+/* Searchable combobox (timezone picker). */
+.combo {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.combo-list {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.combo-item {
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.combo-item.active {
+  background: var(--accent-soft);
+}
+
 .error {
   color: var(--bad);
 }
