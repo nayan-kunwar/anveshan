@@ -100,6 +100,16 @@ default IN, 25/page), changes (7d/24h/all presets, newest first,
 lists link here. Unknown/bad ids render a not-found card
 (`PROGRAM_NOT_FOUND` / `BAD_REQUEST`).
 
+## Programs catalog
+
+`apps/web/app/programs/page.tsx` (public, no login required):
+server-paginated table of every tracked program (25/page) via
+`GET /api/v1/programs`, rows link to `/programs/:id`. Columns:
+Program, Handle, Platform, Tracked (date + time, ISO on hover).
+In-page filter only — the list endpoint has no search param.
+Logged-in users get a "Watched only" toggle (no separate watched
+page). Sidebar has Dashboard + Programs entries.
+
 ## Test split
 
 - `pnpm test`: no network. Fixtures in

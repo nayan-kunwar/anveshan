@@ -138,6 +138,11 @@ interface ProgramPage {
   pagination: { page: number; pageSize: number; total: number };
 }
 
+/** Load one catalog page (server-side pagination, 25/page default). */
+export async function listPrograms(page: number, pageSize = 25): Promise<ProgramPage> {
+  return api<ProgramPage>(`/api/v1/programs?page=${page}&pageSize=${pageSize}`);
+}
+
 /** Load the program catalog (paged, up to 600) for the dashboard search box. */
 export async function listAllPrograms(): Promise<Program[]> {
   const all: Program[] = [];

@@ -303,6 +303,34 @@ ul.clean li button {
   flex-shrink: 0;
 }
 
+/* Catalog table. */
+table.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+table.table th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+table.table td {
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+table.table tr:last-child td {
+  border-bottom: none;
+}
+
 /* Landing page. */
 .hero {
   text-align: center;

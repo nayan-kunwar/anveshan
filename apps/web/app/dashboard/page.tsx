@@ -162,7 +162,7 @@ export default function DashboardPage(): ReactNode {
           <h2>Watch program scope</h2>
           <p className="desc">
             Search the catalog and watch programs. You get mail when watched scope
-            changes.
+            changes. <Link href="/programs">Browse all →</Link>
           </p>
           <input
             type="text"
