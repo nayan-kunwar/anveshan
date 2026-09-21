@@ -261,6 +261,7 @@ See:
 - [`docs/api.md`](docs/api.md)
 - [`docs/running.md`](docs/running.md)
 - [`docs/notification-design.md`](docs/notification-design.md)
+- [`docs/notifications.md`](docs/notifications.md)
 - `docs/architecture.md`
 - `docs/collector.md`
 - `docs/database.md`
