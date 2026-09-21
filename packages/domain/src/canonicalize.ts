@@ -33,14 +33,9 @@ export function canonicalize(raw: string, type: AssetType): string | null {
 }
 
 function canonicalizeUrl(raw: string): string | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    return null;
-  }
+  const parsed = parseHttpUrl(raw);
+  if (!parsed) return null;
   const scheme = parsed.protocol.toLowerCase();
-  if (scheme !== "http:" && scheme !== "https:") return null;
   const host = parsed.hostname.toLowerCase();
   if (host.length === 0) return null;
   let port = parsed.port;
@@ -52,6 +47,48 @@ function canonicalizeUrl(raw: string): string | null {
   const search = parsed.search;
   const hash = parsed.hash;
   return `${scheme}//${host}${port !== "" ? `:${port}` : ""}${path}${search}${hash}`;
+}
+
+/**
+ * Parse an http(s) URL. HackerOne URL-typed scopes are sometimes bare
+ * hosts ("network.helium.com", "Example.COM:8443/app/"); retry those
+ * with an assumed https:// prefix, like browsers do. Retry happens only
+ * when no "://" is present AND the input is not a genuine scheme:
+ * - unparseable without "://" → bare host, retry;
+ * - parsed but non-http scheme with a dot ("Example.COM:…") → that is
+ *   really a hostname (real schemes never contain dots), retry;
+ * - anything else ("ftp://x", "mailto:y") → drop, never stack schemes
+ *   into garbage like "https://ftp//x".
+ */
+function parseHttpUrl(raw: string): URL | null {
+  const direct = parseUrl(raw);
+  if (direct) {
+    if (isHttpScheme(direct)) return direct;
+    if (raw.includes("://") || !schemeLooksLikeHost(raw)) return null;
+  } else if (raw.includes("://")) {
+    return null;
+  }
+  const prefixed = parseUrl(`https://${raw}`);
+  return prefixed && isHttpScheme(prefixed) ? prefixed : null;
+}
+
+function parseUrl(raw: string): URL | null {
+  try {
+    return new URL(raw);
+  } catch {
+    return null;
+  }
+}
+
+function isHttpScheme(parsed: URL): boolean {
+  const scheme = parsed.protocol.toLowerCase();
+  return scheme === "http:" || scheme === "https:";
+}
+
+/** Real schemes never contain dots; "Example.COM:" is a hostname. */
+function schemeLooksLikeHost(raw: string): boolean {
+  const beforeColon = raw.split(":", 1)[0] ?? "";
+  return beforeColon.includes(".");
 }
 
 /**

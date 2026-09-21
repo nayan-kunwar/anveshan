@@ -29,6 +29,19 @@ describe("canonicalize", () => {
     expect(canonicalize("ftp://example.com", "URL")).toBeNull();
   });
 
+  it("assumes https for scheme-less URL scopes (browser behavior)", () => {
+    // Live HackerOne data: URL-typed scopes with bare domains.
+    expect(canonicalize("network.helium.com", "URL")).toBe("https://network.helium.com/");
+    expect(canonicalize("Example.COM:8443/app/", "URL")).toBe(
+      "https://example.com:8443/app",
+    );
+    // Guards: garbage without a scheme still drops, and a scheme is
+    // never stacked ("ftp://" must not become "https://ftp//…").
+    expect(canonicalize("not a url", "URL")).toBeNull();
+    expect(canonicalize("http://exa mple.com", "URL")).toBeNull();
+    expect(canonicalize("ftp://example.com", "URL")).toBeNull();
+  });
+
   it("drops empty and oversized identifiers", () => {
     expect(canonicalize("   ", "DOMAIN")).toBeNull();
     expect(canonicalize("a".repeat(1025), "DOMAIN")).toBeNull();

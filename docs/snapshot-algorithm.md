@@ -68,6 +68,11 @@ Rules:
      (`:443` for https, `:80` for http), remove trailing `/`
      (except root `/`), do NOT strip path/query.
      `https://Example.COM:443/a/` → `https://example.com/a`.
+     Scheme-less scopes (`network.helium.com`) — and dotted
+     pseudo-schemes (`Example.COM:8443/…`, which no real scheme uses) —
+     retry with an assumed `https://` prefix, like browsers. Genuine
+     non-http schemes (`ftp://x`, `mailto:y`) still drop instead of
+     stacking into garbage like `https://ftp//x`.
 3. `IP` / `CIDR`:
    - trim, lowercase (IPv6), validate with Zod; invalid → drop + `warn`.
    - Do not expand CIDR ranges. `/24` and a single IP are different keys.

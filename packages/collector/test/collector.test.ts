@@ -194,6 +194,37 @@ describe("HackerOneClient scopes", () => {
     expect(drops[1]?.["identifier"]).toHaveLength(200);
   });
 
+  it("keeps scheme-less URL scopes by assuming https", async () => {
+    const fetchFn: FetchFn = async () =>
+      jsonResponse({
+        data: [
+          {
+            id: "43254",
+            attributes: {
+              asset_type: "URL",
+              asset_identifier: "network.helium.com",
+              eligible_for_bounty: true,
+            },
+          },
+        ],
+        links: {},
+      });
+    const warnings: string[] = [];
+    const collector = new HackerOneCollector(clientWith(fetchFn), {
+      warn: (m: string) => warnings.push(m),
+    });
+    const assets = await collector.getProgramAssets("helium");
+    expect(assets).toEqual([
+      expect.objectContaining({
+        externalId: "43254",
+        identifier: "https://network.helium.com/",
+        type: "URL",
+        scope: "IN",
+      }),
+    ]);
+    expect(warnings).toEqual([]);
+  });
+
   it("retries 429 honoring Retry-After then succeeds", async () => {
     let calls = 0;
     const fetchFn: FetchFn = async () => {
