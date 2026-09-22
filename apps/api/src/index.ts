@@ -1,7 +1,7 @@
-import { initLocalEnv, loadConfig } from "@anveshan/config";
+import { initLocalEnv, isAuthEmailEnabled, loadConfig } from "@anveshan/config";
 import { closePool, createDb, getPool } from "@anveshan/database";
 import type { SendMailFn } from "@anveshan/notifications";
-import { createMailTransport, createSendMail } from "@anveshan/notifications";
+import { createMailer } from "@anveshan/notifications";
 import { createApp } from "./app.js";
 import { startScheduler } from "./collection/scheduler.js";
 import { createLogger } from "./logger.js";
@@ -15,23 +15,33 @@ async function main(): Promise<void> {
   const pool = getPool(config.DATABASE_URL);
   const db = createDb(pool);
 
-  // Auth emails gate themselves on isAuthEmailEnabled(); without SMTP
-  // settings this transport is never called.
-  const sendMail: SendMailFn =
-    config.SMTP_HOST && config.SMTP_FROM
-      ? createSendMail(
-          createMailTransport({
+  // Auth emails gate themselves on isAuthEmailEnabled(); without a
+  // configured provider this transport is never called.
+  const mailReady =
+    isAuthEmailEnabled(config) &&
+    (config.MAIL_PROVIDER === "brevo"
+      ? Boolean(config.BREVO_API_KEY)
+      : Boolean(config.SMTP_HOST));
+  let sendMail: SendMailFn = async () => {
+    logger.info("mail transport not configured; email skipped");
+  };
+  if (mailReady && config.SMTP_FROM) {
+    sendMail = createMailer({
+      provider: config.MAIL_PROVIDER,
+      from: config.SMTP_FROM,
+      smtp: config.SMTP_HOST
+        ? {
             host: config.SMTP_HOST,
             port: config.SMTP_PORT,
             user: config.SMTP_USER,
             pass: config.SMTP_PASS,
-            from: config.SMTP_FROM,
-          }),
-          config.SMTP_FROM,
-        )
-      : async () => {
-          logger.info("SMTP not configured; email skipped");
-        };
+          }
+        : undefined,
+      brevo: config.BREVO_API_KEY
+        ? { apiKey: config.BREVO_API_KEY, apiUrl: config.BREVO_API_URL }
+        : undefined,
+    });
+  }
 
   startScheduler({ config, pool, logger });
 

@@ -15,7 +15,7 @@ import {
   upsertProgram,
   upsertSubscription,
 } from "@anveshan/database";
-import { createMailTransport, createSendMail } from "@anveshan/notifications";
+import { createMailer } from "@anveshan/notifications";
 import { lastClose } from "@anveshan/notifications";
 import { and, eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -140,8 +140,12 @@ async function main(): Promise<void> {
   }
   if (!config.NOTIFICATIONS_ENABLED)
     throw new Error("NOTIFICATIONS_ENABLED must be true");
-  if (!config.SMTP_HOST || !config.SMTP_USER || !config.SMTP_PASS || !config.SMTP_FROM) {
-    throw new Error("SMTP_HOST/USER/PASS/FROM must all be set for real mail");
+  if (!config.SMTP_FROM) throw new Error("SMTP_FROM must be set for real mail");
+  if (config.MAIL_PROVIDER === "brevo") {
+    if (!config.BREVO_API_KEY)
+      throw new Error("BREVO_API_KEY must be set when MAIL_PROVIDER=brevo");
+  } else if (!config.SMTP_HOST || !config.SMTP_USER || !config.SMTP_PASS) {
+    throw new Error("SMTP_HOST/USER/PASS must be set when MAIL_PROVIDER=smtp");
   }
   if (!config.UNSUBSCRIBE_SECRET) throw new Error("UNSUBSCRIBE_SECRET must be set");
 
@@ -177,16 +181,21 @@ async function main(): Promise<void> {
       );
     }
 
-    const sendMail = createSendMail(
-      createMailTransport({
-        host: config.SMTP_HOST,
-        port: config.SMTP_PORT,
-        user: config.SMTP_USER,
-        pass: config.SMTP_PASS,
-        from: config.SMTP_FROM,
-      }),
-      config.SMTP_FROM,
-    );
+    const sendMail = createMailer({
+      provider: config.MAIL_PROVIDER,
+      from: config.SMTP_FROM,
+      smtp: config.SMTP_HOST
+        ? {
+            host: config.SMTP_HOST,
+            port: config.SMTP_PORT,
+            user: config.SMTP_USER,
+            pass: config.SMTP_PASS,
+          }
+        : undefined,
+      brevo: config.BREVO_API_KEY
+        ? { apiKey: config.BREVO_API_KEY, apiUrl: config.BREVO_API_URL }
+        : undefined,
+    });
     const worker = createDeliveryWorker({ db, config, logger, sendMail });
 
     if (opts.negative) {
