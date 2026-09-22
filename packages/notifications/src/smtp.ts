@@ -1,8 +1,12 @@
 import nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
+import type { MailMessage, SendMailFn } from "./types.js";
+import { MAIL_TIMEOUT_MS } from "./types.js";
 
 /** 10s on every SMTP phase — a hung send must never last 10 minutes. */
-export const SMTP_TIMEOUT_MS = 10_000;
+export const SMTP_TIMEOUT_MS = MAIL_TIMEOUT_MS;
+
+export type { MailMessage, SendMailFn } from "./types.js";
 
 export interface SmtpConfig {
   host: string;
@@ -11,14 +15,6 @@ export interface SmtpConfig {
   pass?: string | undefined;
   from: string;
 }
-
-export interface MailMessage {
-  to: string;
-  subject: string;
-  text: string;
-}
-
-export type SendMailFn = (message: MailMessage) => Promise<void>;
 
 export function createMailTransport(config: SmtpConfig): Transporter {
   return nodemailer.createTransport({
