@@ -2,7 +2,10 @@ openapi: 3.0.3
 info:
   title: Anveshan API
   version: 0.1.0
-  description: Read-only MVP API for HackerOne program/scope monitoring.
+  description: >-
+    Program and scope monitoring API for HackerOne data: public
+    program/asset/change reads, session-authenticated subscriptions and
+    watches, and a key-authenticated admin collection trigger.
 servers:
   - url: http://localhost:3000
 paths:
@@ -264,6 +267,18 @@ paths:
                   description: >
                     Wall-clock daily close (24h HH:MM) in digestTimezone.
                     Optional; omitted fields leave stored values unchanged.
+                digestTimezone:
+                  type: string
+                  example: Asia/Kolkata
+                  description: >
+                    IANA timezone for the daily close. Optional; omitted
+                    fields leave stored values unchanged.
+                digestTimeLocal:
+                  type: string
+                  example: "13:30"
+                  description: >
+                    Wall-clock daily close (24h HH:MM) in digestTimezone.
+                    Optional; omitted fields leave stored values unchanged.
       responses:
         "200":
           description: Saved subscription
@@ -461,11 +476,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
-          description: Collection run not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
+          $ref: "#/components/responses/RunNotFound"
   /api/v1/unsubscribe:
     post:
       summary: Global unsubscribe via signed link token (no login)
@@ -696,7 +707,7 @@ components:
           format: uuid
         status:
           type: string
-          enum: [running, completed, failed, skipped]
+          enum: [running, completed, failed]
         startedAt:
           type: string
           format: date-time
@@ -756,6 +767,12 @@ components:
             $ref: "#/components/schemas/Error"
     ProgramNotFound:
       description: Program not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RunNotFound:
+      description: Collection run not found
       content:
         application/json:
           schema:
