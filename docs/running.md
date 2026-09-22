@@ -29,7 +29,7 @@ Fill in `.env` (see `.env.example`, the source of truth):
 | `DATABASE_URL`                                              | everything                       | Template default points at Docker Postgres (`localhost:5433`) |
 | `HACKERONE_USERNAME` / `HACKERONE_API_TOKEN`                | `pnpm collect`, `pnpm test:live` | Leave blank for API/frontend/tests                            |
 | `MAGIC_LINK_SECRET`, `SESSION_SECRET`, `UNSUBSCRIBE_SECRET` | signing in locally               | Any 32-char strings; fail-closed per endpoint when missing    |
-| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`                       | receiving real emails            | Optional locally (see §6)                                     |
+| `MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `BREVO_API_KEY` | receiving real emails            | Optional locally (see §6)                                     |
 
 Then start Postgres and migrate:
 
@@ -73,7 +73,7 @@ pnpm dev:web
 
 1. Open http://localhost:3001/login, enter your email.
 2. The request always returns 200, even if mail isn't configured.
-3. **Without SMTP** (`SMTP_*` unset): no email goes out — expected locally.
+3. **Without mail config** (`MAIL_PROVIDER=smtp` and no `SMTP_*`, or `brevo` without key): no email goes out — expected locally.
    `AUTH_EMAIL_ENABLED` derives to false and the link is skipped (logged).
 4. **With SMTP** (e.g. Gmail app password for local dev): the sign-in link
    arrives by mail, valid 15 minutes, single-use.
@@ -134,9 +134,9 @@ pnpm test
 See [README Production section](../README.md#production). Short version:
 
 ```bash
-cp .env.example .env   # fill credentials, secrets, SMTP, FRONTEND_URL
+cp .env.example .env   # fill credentials, secrets, MAIL_PROVIDER + mail vars, FRONTEND_URL
 docker compose --profile api up -d --build
 ```
 
 Starts `postgres` + `api` (port 3000) + `web` (port 3001). For real mail:
-`NOTIFICATIONS_ENABLED=true`, SMTP creds, and the three auth secrets.
+`NOTIFICATIONS_ENABLED=true`, `MAIL_PROVIDER=brevo` (or SMTP creds), and the three auth secrets.

@@ -653,12 +653,21 @@ Next.js only (no API call): `GET /unsubscribe?user={userId}&token={hmac}` (confi
 ## Environment variables
 
 ```bash
-# SMTP (Gmail is local-only; use Resend/Postmark/SES in production)
+# Mail provider: smtp | brevo (createMailer factory in packages/notifications)
+MAIL_PROVIDER=smtp
+
+# SMTP (used when MAIL_PROVIDER=smtp; Gmail is local-only — prefer Brevo in prod)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=
 SMTP_PASS=
+
+# Shared From for every provider (Brevo sender must be verified)
 SMTP_FROM=noreply@anveshan.dev
+
+# Brevo HTTP API (MAIL_PROVIDER=brevo)
+BREVO_API_KEY=
+BREVO_API_URL=https://api.brevo.com/v3
 
 # Auth secrets (optional at boot; fail-closed per endpoint, not as one bundle)
 MAGIC_LINK_SECRET=<random-32-chars>
@@ -672,7 +681,7 @@ FRONTEND_URL=http://localhost:3001
 
 # Notifications
 NOTIFICATIONS_ENABLED=false         # false in tests, true in prod
-AUTH_EMAIL_ENABLED=                 # auto-derived when unset (true if SMTP_* set)
+AUTH_EMAIL_ENABLED=                 # auto-derived from provider creds when unset
 DIGEST_TICK_CRON=* * * * *          # per-minute tick over personal digest closes
 IMMEDIATE_EMAIL_CAP=20              # max programs per email
 ASSET_EMAIL_CAP=10                  # max asset lines per program
@@ -833,6 +842,10 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 | ------------------------------------------- | ---------------------------------------------------------------- |
 | `packages/notifications/src/index.ts`       | Public API                                                       |
 | `packages/notifications/src/smtp.ts`        | nodemailer transport (10s send timeout)                          |
+| `packages/notifications/src/brevo.ts`       | Brevo HTTP transport (fetch + 10s timeout)                       |
+| `packages/notifications/src/mailer.ts`      | `createMailer` factory (`MAIL_PROVIDER` → transport)             |
+| `packages/notifications/src/brevo.ts`       | Brevo HTTP transport (fetch + 10s timeout)                       |
+| `packages/notifications/src/mailer.ts`      | `createMailer` factory (`MAIL_PROVIDER` → transport)             |
 | `packages/notifications/src/templates.ts`   | renderImmediate, renderDaily (pure)                              |
 | `packages/notifications/src/digest-time.ts` | per-user close math: lastClose, nextClose (pure, Intl only)      |
 | `apps/api/src/auth/routes.ts`               | request-magic-link, verify, me, logout                           |

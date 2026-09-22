@@ -52,9 +52,9 @@ See `.env.example` (source of truth). Key vars:
     LOG_LEVEL=info
     PORT=3000
 
-Milestone 2 adds: `SMTP_*`, `MAGIC_LINK_SECRET`, `SESSION_SECRET`,
+Milestone 2 adds: `MAIL_PROVIDER`, `SMTP_*`, `BREVO_*`, `MAGIC_LINK_SECRET`, `SESSION_SECRET`,
 `UNSUBSCRIBE_SECRET`, `FRONTEND_URL`, `NOTIFICATIONS_ENABLED` (default
-false), `AUTH_EMAIL_ENABLED` (derived from `SMTP_*` when unset),
+false), `AUTH_EMAIL_ENABLED` (derived from provider creds when unset),
 `DIGEST_TICK_CRON` (per-minute tick over personal digest closes),
 `IMMEDIATE_EMAIL_CAP`, `ASSET_EMAIL_CAP`.
 See `.env.example` (source of truth).

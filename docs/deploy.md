@@ -44,13 +44,17 @@ your domain → rewrite → API), so no CORS setup is needed.
 | `FRONTEND_URL`                              | Yes in practice                 | Exact Vercel URL, no trailing slash (see §4)                                        |
 | `MAGIC_LINK_SECRET`, `SESSION_SECRET`       | Yes for login                   | 32+ random chars (`openssl rand -base64 32`); fail-closed per endpoint when missing |
 | `UNSUBSCRIBE_SECRET`                        | Yes for mail links              | Same generation; every email embeds links signed with it                            |
-| `SMTP_HOST/PORT/USER/PASS/FROM`             | Yes for real mail               | Gmail is local-only; use Resend/Postmark/SES in production                          |
+| `MAIL_PROVIDER`                           | No (`smtp`)                     | `smtp` or `brevo` — selects the mail transport factory         |
+| `SMTP_HOST/PORT/USER/PASS`                | Yes when `MAIL_PROVIDER=smtp`   | Gmail is local-only; prefer Brevo HTTP in production           |
+| `SMTP_FROM`                               | Yes for real mail               | Shared From for SMTP and Brevo (verified sender)               |
+| `BREVO_API_KEY`                           | Yes when `MAIL_PROVIDER=brevo`  | Brevo account API key (`xkeysib-…`)                            |
+| `BREVO_API_URL`                           | No                              | Default `https://api.brevo.com/v3`                             |
 | `NOTIFICATIONS_ENABLED`                     | Yes for change mail             | Default `false` = outbox never enqueues/drains                                      |
 | `HACKERONE_USERNAME`, `HACKERONE_API_TOKEN` | Yes for collection              | Every collection run fails closed without them                                      |
 | `PORT`, `LOG_LEVEL`                         | No (`3000`, `info`)             | Match the host's expected port if required                                          |
 | `COLLECTION_CRON`, `COLLECTION_TZ`          | No (`*/30 * * * *`, `UTC`)      | Scheduler cadence                                                                   |
 | `DIGEST_TICK_CRON`                          | No (`* * * * *`)                | Per-minute tick over personal digest closes (Settings → time + timezone)            |
-| `AUTH_EMAIL_ENABLED`                        | No (auto-derived from `SMTP_*`) | Explicit override only if needed                                                    |
+| `AUTH_EMAIL_ENABLED`                        | No (auto-derived from provider) | Explicit override only if needed                                                    |
 
 After boot, logs must show `anveshan api listening` plus the scheduler
 and digest-cron start lines — and must **not** show
@@ -86,7 +90,7 @@ already honours it).
 
 - [ ] API + managed Postgres deployed; `DATABASE_URL` reachable from API host
 - [ ] `FRONTEND_URL` = exact Vercel URL on the API; `API_INTERNAL_URL` = API URL on Vercel (then redeploy frontend)
-- [ ] Three secrets set; SMTP set; `NOTIFICATIONS_ENABLED=true`; HackerOne creds set
+- [ ] Three secrets set; `MAIL_PROVIDER` + matching mail vars set; `NOTIFICATIONS_ENABLED=true`; HackerOne creds set
 - [ ] `curl https://<api-host>/health` → `{"status":"ok"}`
 - [ ] Login flow works end-to-end (magic link → callback → dashboard, no bounce to `/login`)
 - [ ] `pnpm mail:test -- --email you@yopmail.com --yes` (from a machine with DB access) still sends
@@ -100,6 +104,7 @@ already honours it).
 | Magic-link requested, login loops back to `/login`     | `FRONTEND_URL` still localhost/`http` → cookie set without `Secure` on an https site → browser drops it | Set `FRONTEND_URL` to the https Vercel URL, restart API       |
 | `401 UNAUTHORIZED` / `INVALID_TOKEN` on auth endpoints | Secrets missing (fail-closed by design)                                                                 | Set the three `*_SECRET` vars, restart API                    |
 | No change mail, worker log says `disabled`             | `NOTIFICATIONS_ENABLED` unset/false                                                                     | Set `true`, restart API                                       |
-| No mail at all, magic link included                    | `SMTP_*` unset (`AUTH_EMAIL_ENABLED` derives false)                                                     | Set SMTP vars                                                 |
+| No mail at all, magic link included                    | Wrong `MAIL_PROVIDER` / missing provider creds (`AUTH_EMAIL_ENABLED` derives false) | Set provider + matching vars (`brevo` → `BREVO_API_KEY`; `smtp` → `SMTP_*`) |
+| Magic link times out (`SMTP send timed out`)          | SMTP host unreachable from host (common with Gmail on cloud)                    | Switch to `MAIL_PROVIDER=brevo` + verified sender               |
 | Emails link to localhost                               | Stale `FRONTEND_URL`                                                                                    | Update to Vercel URL, restart API (links render at send time) |
 | New deploy didn't pick up API URL change               | Rewrites bake `API_INTERNAL_URL` at build                                                               | Redeploy the frontend after changing the variable             |
