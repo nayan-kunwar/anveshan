@@ -54,7 +54,6 @@ export const envSchema = z.object({
   FRONTEND_URL: z.string().url().default("http://localhost:3001"),
   NOTIFICATIONS_ENABLED: booleanFromString.default(false),
   AUTH_EMAIL_ENABLED: booleanFromString.optional(),
-  DAILY_DIGEST_CRON: z.string().min(1).default("0 8 * * *"),
   // Per-minute tick that enqueues digests for users whose personal close
   // just passed. Digest times live per-user in subscriptions
   // (digest_timezone + digest_time_local).
