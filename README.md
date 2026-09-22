@@ -263,6 +263,7 @@ See:
 - [`docs/deploy.md`](docs/deploy.md)
 - [`docs/notification-design.md`](docs/notification-design.md)
 - [`docs/notifications.md`](docs/notifications.md)
+- [`docs/daily-digest.md`](docs/daily-digest.md)
 - `docs/architecture.md`
 - `docs/collector.md`
 - `docs/database.md`

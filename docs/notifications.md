@@ -3,6 +3,9 @@
 One rule: **mail is sent only for verified, subscribed users whose
 watch settings match a change.** No match → no mail, no error.
 
+Daily digest mechanics (closes, windows, catch-up, late mail):
+`daily-digest.md`.
+
 ## The three events that can trigger mail
 
 | Event           | Meaning                                          | Needs (besides the basics below)            |
@@ -36,9 +39,10 @@ watch settings match a change.** No match → no mail, no error.
 - A program disappearing from HackerOne (ignored; no
   `PROGRAM_REMOVED` event exists).
 - Zero-change collections (baseline runs, unchanged re-runs).
-- Wrong cadence path: `daily` users get one 08:00 UTC digest for the
-  prior 24h window; `immediate` users get one mail per collection run
-  that has changes.
+- Wrong cadence path: `daily` users get one digest per personal close
+  (their time + timezone in Settings) covering the prior 24h window;
+  `immediate` users get one mail per collection run that has changes.
+  See `daily-digest.md` for windows, catch-up, and late mail.
 
 ## When mail doesn't arrive (debugging)
 

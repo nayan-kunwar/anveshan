@@ -35,7 +35,7 @@ Key principle: **SMTP never runs inside the collection lock.** Enqueue is INSERT
 
 `pnpm collect` and the scheduler **only enqueue**. The delivery worker, digest cron, and catch-up run in the API process (`apps/api/src/index.ts`). CLI-only collection without the API leaves rows `pending` until the API starts. Production always runs the API.
 
-Change-mail paths (`enqueueImmediate`, `enqueueDailyDigest`, catch-up, delivery worker, digest cron) **no-op when `NOTIFICATIONS_ENABLED=false`**. Magic-link send uses `isAuthEmailEnabled()` only and is independent of that flag.
+Change-mail paths (`enqueueImmediate`, `enqueueDueDigests`, catch-up, delivery worker, digest tick) **no-op when `NOTIFICATIONS_ENABLED=false`**. Magic-link send uses `isAuthEmailEnabled()` only and is independent of that flag.
 
 ---
 
@@ -407,8 +407,9 @@ and `(collection_run_id)`).
 ### Catch-up
 
 Closes the gap if the process dies after collection commit and before
-enqueue, or if the API is down across 08:00 UTC. Runs on API boot and at
-the start of every delivery-worker tick (inside the drain mutex).
+enqueue, if a tick is missed, or if the API is down across a user's
+close. Runs on API boot and at the start of every delivery-worker tick
+(inside the drain mutex).
 No-op when `NOTIFICATIONS_ENABLED=false`. Never takes the collection lock.
 
 Eligibility is evaluated **now** (current `frequency`, watches, unsubscribe).
@@ -496,10 +497,11 @@ A hung send must not last 10 minutes.
    a. Re-check email_verified_at + unsubscribed_at
       → if unverified or unsubscribed: SET status = 'skipped', updated_at = now()
    b. Reload the change set for this delivery, then re-apply the filter matrix:
-      - kind = immediate: WHERE collection_run_id = delivery.collection_run_id
-      - kind = daily:     WHERE detected_at >= digest_on 08:00 UTC − 24h
-                          AND   detected_at <  digest_on 08:00 UTC
-        (same window as enqueueDailyDigest; join programs for names)
+       - kind = immediate: WHERE collection_run_id = delivery.collection_run_id
+       - kind = daily:     window from the pinned digest_close_at
+                           ([close − 24h, close); legacy NULL rows fall back
+                           to the digest_on 08:00 UTC derivation)
+         (same window as enqueue; join programs for names)
       → if no changes pass: SET status = 'skipped', updated_at = now()
    c. Render email → send via nodemailer (10s timeout)
       → success: SET status = 'sent', sent_at = now(), updated_at = now()
@@ -788,7 +790,7 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 | watch_all=true + watch_new=true → everything                                | Filter matrix row 6                    |
 | Stale `sending` rows reset to `pending`                                     | Crash recovery                         |
 | Stale `sending` with attempts=3 → pending attempts=2, claimed again         | Crash does not exhaust retries         |
-| `enqueueDailyDigest` twice for same digest_on → 1 row                       | Unique constraint                      |
+| `enqueueDueDigests` twice for the same close → 1 row                        | Unique constraint                      |
 | `lastClose` skips DST-gap wall times, resolves overlaps to latest ≤ now     | Close math                             |
 | `nextClose` jumps a DST-gap day                                             | Close math                             |
 | Tick enqueues only users whose close just passed; repeat tick inserts 0     | Per-user tick                          |
@@ -816,31 +818,31 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 | Clear unsubscribed_at on PUT /subscriptions                                 | Re-subscribe                           |
 | Catch-up re-calls enqueueImmediate for a completed run with 0 delivery rows | Missed enqueue                         |
 | Catch-up of an already-enqueued run inserts 0                               | Catch-up idempotency                   |
-| Catch-up after 08:00 UTC enqueues today's digest if missing                 | Missed digest day                      |
+| Catch-up enqueues the user's last closes when missing                       | Missed digest day                      |
 | Enqueue throw is caught; collection summary stays completed                 | Isolation                              |
 | Magic-link SMTP timeout still returns 200                                   | No email oracle                        |
 | Overlapping worker tick while draining → second tick no-ops                 | Drain mutex, no double-send            |
 | Change-mail SMTP uses 10s timeout                                           | Hung send cannot hit stale recovery    |
-| User switched to daily after 08:00; catch-up may insert today's digest      | Catch-up uses current eligibility      |
+| User switched to daily; catch-up may insert a digest for the last closes    | Catch-up uses current eligibility      |
 
 ---
 
 ## Files to create
 
-| File                                        | Purpose                                                       |
-| ------------------------------------------- | ------------------------------------------------------------- |
-| `packages/notifications/src/index.ts`       | Public API                                                    |
-| `packages/notifications/src/smtp.ts`        | nodemailer transport (10s send timeout)                       |
-| `packages/notifications/src/templates.ts`   | renderImmediate, renderDaily (pure)                           |
-| `packages/notifications/src/digest-time.ts` | per-user close math: lastClose, nextClose (pure, Intl only)   |
-| `apps/api/src/auth/routes.ts`               | request-magic-link, verify, me, logout                        |
-| `apps/api/src/auth/middleware.ts`           | requireSession                                                |
-| `apps/api/src/auth/tokens.ts`               | HMAC helpers (magic link + unsubscribe)                       |
-| `apps/api/src/auth/rate-limit.ts`           | Per-IP + per-email rate limiter                               |
-| `apps/api/src/subscriptions/routes.ts`      | Subscription + watch CRUD                                     |
-| `apps/api/src/notifications/enqueue.ts`     | enqueueImmediate, enqueueDailyDigest, catch-up                |
-| `apps/api/src/notifications/worker.ts`      | Drain mutex + claim + send + retry + stale recovery + skipped |
-| `apps/web/`                                 | Next.js (login, dashboard, unsubscribe confirm)               |
+| File                                        | Purpose                                                          |
+| ------------------------------------------- | ---------------------------------------------------------------- |
+| `packages/notifications/src/index.ts`       | Public API                                                       |
+| `packages/notifications/src/smtp.ts`        | nodemailer transport (10s send timeout)                          |
+| `packages/notifications/src/templates.ts`   | renderImmediate, renderDaily (pure)                              |
+| `packages/notifications/src/digest-time.ts` | per-user close math: lastClose, nextClose (pure, Intl only)      |
+| `apps/api/src/auth/routes.ts`               | request-magic-link, verify, me, logout                           |
+| `apps/api/src/auth/middleware.ts`           | requireSession                                                   |
+| `apps/api/src/auth/tokens.ts`               | HMAC helpers (magic link + unsubscribe)                          |
+| `apps/api/src/auth/rate-limit.ts`           | Per-IP + per-email rate limiter                                  |
+| `apps/api/src/subscriptions/routes.ts`      | Subscription + watch CRUD                                        |
+| `apps/api/src/notifications/enqueue.ts`     | enqueueImmediate, enqueueDueDigests + catch-up, grouped by close |
+| `apps/api/src/notifications/worker.ts`      | Drain mutex + claim + send + retry + stale recovery + skipped    |
+| `apps/web/`                                 | Next.js (login, dashboard, unsubscribe confirm)                  |
 
 ## Files to modify
 
