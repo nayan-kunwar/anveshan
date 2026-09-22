@@ -3,7 +3,7 @@ import type { Transporter } from "nodemailer";
 import type { MailMessage, SendMailFn } from "./types.js";
 import { MAIL_TIMEOUT_MS } from "./types.js";
 
-/** 10s on every SMTP phase — a hung send must never last 10 minutes. */
+/** Default budget when not overridden — a hung send must never last forever. */
 export const SMTP_TIMEOUT_MS = MAIL_TIMEOUT_MS;
 
 export type { MailMessage, SendMailFn } from "./types.js";

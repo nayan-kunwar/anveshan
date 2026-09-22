@@ -48,10 +48,12 @@ describe("loadConfig", () => {
       PORT: "4000",
       COLLECTION_ENABLED: "false",
       H1_MIN_DELAY_MS: "500",
+      MAIL_SEND_TIMEOUT_MS: "45000",
     });
     expect(config.PORT).toBe(4000);
     expect(config.COLLECTION_ENABLED).toBe(false);
     expect(config.H1_MIN_DELAY_MS).toBe(500);
+    expect(config.MAIL_SEND_TIMEOUT_MS).toBe(45000);
   });
 
   it("returns credentials when present", () => {
@@ -71,6 +73,7 @@ describe("loadConfig", () => {
     expect(config.NOTIFICATIONS_ENABLED).toBe(false);
     expect(config.AUTH_EMAIL_ENABLED).toBeUndefined();
     expect(config.MAIL_PROVIDER).toBe("smtp");
+    expect(config.MAIL_SEND_TIMEOUT_MS).toBe(30_000);
     expect(config.BREVO_API_KEY).toBeUndefined();
     expect(config.DIGEST_TICK_CRON).toBe("* * * * *");
     expect(config.IMMEDIATE_EMAIL_CAP).toBe(20);
@@ -92,8 +95,10 @@ describe("loadConfig", () => {
       SESSION_SECRET: "",
       UNSUBSCRIBE_SECRET: "",
       AUTH_EMAIL_ENABLED: "",
+      MAIL_SEND_TIMEOUT_MS: "",
     });
     expect(config.MAIL_PROVIDER).toBe("smtp");
+    expect(config.MAIL_SEND_TIMEOUT_MS).toBe(30_000);
     expect(config.SMTP_HOST).toBeUndefined();
     expect(config.BREVO_API_KEY).toBeUndefined();
     expect(config.MAGIC_LINK_SECRET).toBeUndefined();

@@ -50,6 +50,8 @@ export const envSchema = z.object({
   SMTP_FROM: z.string().email().optional(),
   BREVO_API_KEY: z.string().min(1).optional(),
   BREVO_API_URL: z.string().url().optional(),
+  // Per-send mail budget (ms). Default 30s; raise on slow SMTP paths.
+  MAIL_SEND_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   MAGIC_LINK_SECRET: z.string().min(16).optional(),
   MAGIC_LINK_EXPIRY: z.coerce.number().int().positive().default(900000),
   SESSION_SECRET: z.string().min(16).optional(),
@@ -122,6 +124,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     "SMTP_FROM",
     "BREVO_API_KEY",
     "BREVO_API_URL",
+    "MAIL_SEND_TIMEOUT_MS",
     "MAGIC_LINK_SECRET",
     "SESSION_SECRET",
     "UNSUBSCRIBE_SECRET",

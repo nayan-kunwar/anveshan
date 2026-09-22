@@ -6,8 +6,8 @@ export interface MailMessage {
 
 export type SendMailFn = (message: MailMessage) => Promise<void>;
 
-/** Shared send budget — hung sends must never last 10 minutes. */
-export const MAIL_TIMEOUT_MS = 10_000;
+/** Shared send budget — hung sends must never last forever. Configurable via MAIL_SEND_TIMEOUT_MS. */
+export const MAIL_TIMEOUT_MS = 30_000;
 
 export type MailProvider = "smtp" | "brevo";
 
