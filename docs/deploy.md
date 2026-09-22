@@ -56,6 +56,30 @@ After boot, logs must show `anveshan api listening` plus the scheduler
 and digest-cron start lines — and must **not** show
 `delivery worker disabled (NOTIFICATIONS_ENABLED=false)`.
 
+### Render field values (native, no Docker)
+
+Use a **Web Service** with the **native** runtime (leave the Docker
+option off) — set these fields exactly:
+
+| Field              | Value                                                                    |
+| ------------------ | ------------------------------------------------------------------------ |
+| Root Directory     | _(empty — monorepo root, not `apps/api`)_                                |
+| Build Command      | `pnpm install --frozen-lockfile && pnpm --filter @anveshan/api... build` |
+| Start Command      | `node apps/api/dist/index.js`                                            |
+| Env `NODE_VERSION` | `22` (matches `apps/api/Dockerfile`; Render's default 24 works too)      |
+
+Never put `corepack enable` in the Build Command: Render's `/usr/bin`
+is read-only, corepack fails with `EROFS: read-only file system`, and
+the build dies before `pnpm install`. Render detects pnpm from
+`pnpm-lock.yaml` and provides it natively — the install needs no
+shim. The scoped `--filter @anveshan/api...` build compiles the API
+and its workspace dependencies only, skipping the Next.js build (and
+its memory cost) on an API-only service.
+
+After the first green deploy, run once in **Render Shell**:
+`pnpm db:migrate`. Do not set `PORT` (Render injects it; Express
+already honours it).
+
 ---
 
 ## 3. Wiring checklist
