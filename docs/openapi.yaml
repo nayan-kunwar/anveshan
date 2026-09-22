@@ -349,6 +349,123 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /api/v1/admin/collections:
+    post:
+      summary: Trigger a collection run (async, admin key required)
+      description: >
+        Returns 202 immediately; the 15-20 minute run proceeds in the
+        background. Returns 200 with status skipped when a trigger is
+        already in flight. Poll GET /api/v1/admin/collections for status.
+        Header X-Admin-Key must match ADMIN_API_KEY (fail-closed when unset).
+      parameters:
+        - name: X-Admin-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Collection started
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [status, startedAt]
+                    properties:
+                      status:
+                        type: string
+                        example: running
+                      startedAt:
+                        type: string
+                        format: date-time
+        "200":
+          description: Trigger skipped (already in flight)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [status, startedAt]
+                    properties:
+                      status:
+                        type: string
+                        example: skipped
+                      startedAt:
+                        type: string
+                        format: date-time
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      summary: List recent collection runs (admin key required)
+      parameters:
+        - name: X-Admin-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Recent runs, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminRun"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/admin/collections/{id}:
+    get:
+      summary: Get a collection run by id (admin key required)
+      parameters:
+        - name: X-Admin-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Collection run
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AdminRun"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Collection run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/unsubscribe:
     post:
       summary: Global unsubscribe via signed link token (no login)
@@ -560,6 +677,49 @@ components:
           type: string
         externalId:
           type: string
+    AdminRun:
+      type: object
+      required:
+        [
+          id,
+          status,
+          startedAt,
+          programsSeen,
+          assetsSeen,
+          programsAdded,
+          assetsAdded,
+          assetsRemoved,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [running, completed, failed, skipped]
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        programsSeen:
+          type: integer
+        assetsSeen:
+          type: integer
+        programsAdded:
+          type: integer
+        assetsAdded:
+          type: integer
+        assetsRemoved:
+          type: integer
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
     Error:
       type: object
       required: [error]
@@ -573,6 +733,7 @@ components:
               enum:
                 [
                   PROGRAM_NOT_FOUND,
+                  RUN_NOT_FOUND,
                   BAD_REQUEST,
                   INTERNAL,
                   COLLECTION_FAILED,

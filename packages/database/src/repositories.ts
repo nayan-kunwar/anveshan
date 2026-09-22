@@ -277,6 +277,29 @@ export async function failRun(
     .where(eq(collectionRuns.id, id));
 }
 
+export async function listRecentRuns(
+  db: Db,
+  limit: number,
+): Promise<(typeof collectionRuns.$inferSelect)[]> {
+  return db
+    .select()
+    .from(collectionRuns)
+    .orderBy(desc(collectionRuns.startedAt))
+    .limit(limit);
+}
+
+export async function findRunById(
+  db: Db,
+  id: string,
+): Promise<typeof collectionRuns.$inferSelect | undefined> {
+  const rows = await db
+    .select()
+    .from(collectionRuns)
+    .where(eq(collectionRuns.id, id))
+    .limit(1);
+  return rows[0];
+}
+
 export async function countCompletedRuns(db: Db): Promise<number> {
   const rows = await db
     .select({ value: count() })

@@ -2,6 +2,7 @@ import { initLocalEnv, isAuthEmailEnabled, loadConfig } from "@anveshan/config";
 import { closePool, createDb, getPool } from "@anveshan/database";
 import type { SendMailFn } from "@anveshan/notifications";
 import { createMailer } from "@anveshan/notifications";
+import { createAdminService } from "./admin/routes.js";
 import { createApp } from "./app.js";
 import { startScheduler } from "./collection/scheduler.js";
 import { createLogger } from "./logger.js";
@@ -57,6 +58,7 @@ async function main(): Promise<void> {
     db,
     config,
     sendMail,
+    adminService: createAdminService({ config, pool, logger, db }),
   });
   const server = app.listen(config.PORT, () => {
     logger.info({ port: config.PORT }, "anveshan api listening");

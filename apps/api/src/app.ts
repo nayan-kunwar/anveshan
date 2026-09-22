@@ -4,6 +4,9 @@ import type { SendMailFn } from "@anveshan/notifications";
 import express from "express";
 import type { NextFunction, Request, Response } from "express";
 import type { Logger } from "pino";
+import { createRequireAdminKey } from "./admin/auth.js";
+import { createAdminRoutes } from "./admin/routes.js";
+import type { AdminService } from "./admin/routes.js";
 import { createRequireSession } from "./auth/middleware.js";
 import { createEmailRateLimiter, createIpRateLimiter } from "./auth/rate-limit.js";
 import { createAuthRoutes } from "./auth/routes.js";
@@ -19,6 +22,8 @@ export interface AppDeps {
   db?: Database | undefined;
   config?: AppConfig | undefined;
   sendMail?: SendMailFn | undefined;
+  /** Admin routes mount only when this plus config are present. */
+  adminService?: AdminService | undefined;
 }
 
 export function createApp(deps: AppDeps): express.Express {
@@ -89,6 +94,29 @@ export function createApp(deps: AppDeps): express.Express {
       "/api/v1/subscriptions/watches/:programId",
       requireSessionHandler,
       asyncRoute(subscriptions.removeWatch),
+    );
+  }
+
+  if (deps.adminService && deps.config) {
+    const requireAdminKey = createRequireAdminKey({
+      adminKey: deps.config.ADMIN_API_KEY,
+      logger: deps.logger,
+    });
+    const admin = createAdminRoutes(deps.adminService);
+    app.post(
+      "/api/v1/admin/collections",
+      requireAdminKey,
+      asyncRoute(admin.triggerCollections),
+    );
+    app.get(
+      "/api/v1/admin/collections",
+      requireAdminKey,
+      asyncRoute(admin.listCollections),
+    );
+    app.get(
+      "/api/v1/admin/collections/:id",
+      requireAdminKey,
+      asyncRoute(admin.getCollection),
     );
   }
 

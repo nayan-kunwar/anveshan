@@ -94,6 +94,7 @@ describe("loadConfig", () => {
       MAGIC_LINK_SECRET: "",
       SESSION_SECRET: "",
       UNSUBSCRIBE_SECRET: "",
+      ADMIN_API_KEY: "",
       AUTH_EMAIL_ENABLED: "",
       MAIL_SEND_TIMEOUT_MS: "",
     });
@@ -102,6 +103,7 @@ describe("loadConfig", () => {
     expect(config.SMTP_HOST).toBeUndefined();
     expect(config.BREVO_API_KEY).toBeUndefined();
     expect(config.MAGIC_LINK_SECRET).toBeUndefined();
+    expect(config.ADMIN_API_KEY).toBeUndefined();
     expect(config.AUTH_EMAIL_ENABLED).toBeUndefined();
   });
 
@@ -120,9 +122,9 @@ describe("loadConfig", () => {
   });
 
   it("derives AUTH_EMAIL_ENABLED from BREVO_API_KEY when MAIL_PROVIDER=brevo", () => {
-    expect(
-      isAuthEmailEnabled(loadConfig({ ...baseEnv, MAIL_PROVIDER: "brevo" })),
-    ).toBe(false);
+    expect(isAuthEmailEnabled(loadConfig({ ...baseEnv, MAIL_PROVIDER: "brevo" }))).toBe(
+      false,
+    );
     expect(
       isAuthEmailEnabled(
         loadConfig({

@@ -17,6 +17,14 @@ export const programIdParamSchema = z.object({
   id: z.string().uuid("Program id must be a UUID"),
 });
 
+// --- Manual admin collection trigger ---
+
+export const adminRecentRunsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+});
+
+export type AdminRecentRunsQuery = z.infer<typeof adminRecentRunsQuerySchema>;
+
 export const assetsQuerySchema = z.object({
   scope: z.enum(["ALL", "IN", "OUT"]).default("ALL"),
   page: pageSchema,

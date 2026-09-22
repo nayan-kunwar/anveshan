@@ -1,5 +1,6 @@
 export type ErrorCode =
   | "PROGRAM_NOT_FOUND"
+  | "RUN_NOT_FOUND"
   | "BAD_REQUEST"
   | "INTERNAL"
   | "COLLECTION_FAILED"
@@ -49,6 +50,7 @@ export class AppError extends Error {
 
 const STATUS_BY_CODE: Record<ErrorCode, number> = {
   PROGRAM_NOT_FOUND: 404,
+  RUN_NOT_FOUND: 404,
   BAD_REQUEST: 400,
   INTERNAL: 500,
   COLLECTION_FAILED: 502,

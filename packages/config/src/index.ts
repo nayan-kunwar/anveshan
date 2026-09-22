@@ -57,6 +57,9 @@ export const envSchema = z.object({
   SESSION_SECRET: z.string().min(16).optional(),
   SESSION_EXPIRY: z.coerce.number().int().positive().default(2592000000),
   UNSUBSCRIBE_SECRET: z.string().min(16).optional(),
+  // Manual collection trigger (POST /api/v1/admin/collections).
+  // Optional at boot; the admin endpoint is fail-closed when unset.
+  ADMIN_API_KEY: z.string().min(16).optional(),
   FRONTEND_URL: z.string().url().default("http://localhost:3001"),
   NOTIFICATIONS_ENABLED: booleanFromString.default(false),
   AUTH_EMAIL_ENABLED: booleanFromString.optional(),
@@ -128,6 +131,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     "MAGIC_LINK_SECRET",
     "SESSION_SECRET",
     "UNSUBSCRIBE_SECRET",
+    "ADMIN_API_KEY",
     "AUTH_EMAIL_ENABLED",
     "FRONTEND_URL",
   ] as const) {
