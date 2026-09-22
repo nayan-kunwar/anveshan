@@ -4,10 +4,12 @@ import {
   desc,
   eq,
   gte,
+  ilike,
   isNotNull,
   isNull,
   lt,
   notInArray,
+  or,
   sql,
 } from "drizzle-orm";
 import type {
@@ -103,16 +105,30 @@ export async function countPrograms(db: Db): Promise<number> {
   return rows[0]?.value ?? 0;
 }
 
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 export async function listPrograms(
   db: Db,
   page: number,
   pageSize: number,
+  q?: string,
 ): Promise<{ items: ProgramRow[]; total: number }> {
-  const totalRows = await db.select({ value: count() }).from(programs);
+  const trimmed = q?.trim();
+  const where =
+    trimmed && trimmed.length > 0
+      ? or(
+          ilike(programs.name, `%${escapeLikePattern(trimmed)}%`),
+          ilike(programs.externalId, `%${escapeLikePattern(trimmed)}%`),
+        )
+      : undefined;
+  const totalRows = await db.select({ value: count() }).from(programs).where(where);
   const total = totalRows[0]?.value ?? 0;
   const items = await db
     .select()
     .from(programs)
+    .where(where)
     .orderBy(programs.name)
     .limit(pageSize)
     .offset((page - 1) * pageSize);

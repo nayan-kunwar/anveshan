@@ -32,7 +32,8 @@ export function createProgramController(store: ProgramStore): {
   return {
     listPrograms: async (req, res) => {
       const query = parseQuery(programsQuerySchema, req.query);
-      const { items, total } = await store.listPrograms(query.page, query.pageSize);
+      const q = query.q?.trim() ? query.q.trim() : undefined;
+      const { items, total } = await store.listPrograms(query.page, query.pageSize, q);
       res.json({
         data: items.map(toProgramDto),
         pagination: { page: query.page, pageSize: query.pageSize, total },

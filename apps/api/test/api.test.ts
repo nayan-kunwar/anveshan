@@ -86,10 +86,21 @@ const changes: ChangeRow[] = [
 ];
 
 const store: ProgramStore = {
-  listPrograms: async (page, pageSize) => ({
-    items: programs.slice((page - 1) * pageSize, page * pageSize),
-    total: programs.length,
-  }),
+  listPrograms: async (page, pageSize, q) => {
+    const trimmed = q?.trim().toLowerCase();
+    const filtered =
+      trimmed && trimmed.length > 0
+        ? programs.filter(
+            (p) =>
+              p.name.toLowerCase().includes(trimmed) ||
+              p.externalId.toLowerCase().includes(trimmed),
+          )
+        : programs;
+    return {
+      items: filtered.slice((page - 1) * pageSize, page * pageSize),
+      total: filtered.length,
+    };
+  },
   findProgramById: async (id) => programs.find((p) => p.id === id),
   listAssets: async (programId, scope, page, pageSize) => {
     const filtered = assets.filter(
@@ -129,6 +140,38 @@ describe("GET /api/v1/programs", () => {
 
   it("rejects pageSize over 100 with BAD_REQUEST", async () => {
     const res = await request(app).get("/api/v1/programs?pageSize=101").expect(400);
+    expect(res.body.error.code).toBe("BAD_REQUEST");
+  });
+
+  it("filters by q on name (case-insensitive substring)", async () => {
+    const res = await request(app).get("/api/v1/programs?q=acm").expect(200);
+    expect(res.body.pagination.total).toBe(1);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0]).toMatchObject({ externalId: "acme" });
+  });
+
+  it("filters by q on handle and is case-insensitive", async () => {
+    const res = await request(app).get("/api/v1/programs?q=GLOB").expect(200);
+    expect(res.body.pagination.total).toBe(1);
+    expect(res.body.data[0]).toMatchObject({ externalId: "globex" });
+  });
+
+  it("returns zero matches with total 0", async () => {
+    const res = await request(app).get("/api/v1/programs?q=no-such-program").expect(200);
+    expect(res.body.pagination.total).toBe(0);
+    expect(res.body.data).toHaveLength(0);
+  });
+
+  it("treats q literally (no wildcard injection)", async () => {
+    const res = await request(app).get("/api/v1/programs?q=%").expect(200);
+    expect(res.body.pagination.total).toBe(0);
+    expect(res.body.data).toHaveLength(0);
+  });
+
+  it("rejects q over 100 chars with BAD_REQUEST", async () => {
+    const res = await request(app)
+      .get(`/api/v1/programs?q=${"a".repeat(101)}`)
+      .expect(400);
     expect(res.body.error.code).toBe("BAD_REQUEST");
   });
 });

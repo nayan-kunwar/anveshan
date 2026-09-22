@@ -44,10 +44,10 @@ export default function ProgramsPage(): ReactNode {
     }
   }, []);
 
-  const loadPage = useCallback(async (next: number) => {
+  const loadPage = useCallback(async (next: number, search?: string) => {
     setError(null);
     try {
-      const res = await listPrograms(next, PAGE_SIZE);
+      const res = await listPrograms(next, PAGE_SIZE, search);
       setPrograms(res.data);
       setPage(res.pagination.page);
       setTotal(res.pagination.total);
@@ -63,8 +63,12 @@ export default function ProgramsPage(): ReactNode {
   }, [loadSession]);
 
   useEffect(() => {
-    void loadPage(1);
-  }, [loadPage]);
+    const trimmed = query.trim();
+    const timer = setTimeout(() => {
+      void loadPage(1, trimmed ? trimmed : undefined);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, loadPage]);
 
   async function onLogout(): Promise<void> {
     await logout();
@@ -89,12 +93,7 @@ export default function ProgramsPage(): ReactNode {
     }
   }
 
-  const q = query.trim().toLowerCase();
-  const visible = programs.filter((p) => {
-    if (watchedOnly && !watchedIds.has(p.id)) return false;
-    if (q.length === 0) return true;
-    return p.name.toLowerCase().includes(q) || p.externalId.toLowerCase().includes(q);
-  });
+  const visible = watchedOnly ? programs.filter((p) => watchedIds.has(p.id)) : programs;
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -103,11 +102,11 @@ export default function ProgramsPage(): ReactNode {
       <div className="card">
         <h2>Programs ({total})</h2>
         <p className="desc">
-          Every program in the HackerOne catalog. Search filters this page.
+          Every program in the HackerOne catalog. Search across all programs.
         </p>
         <input
           type="text"
-          placeholder="Filter this page…"
+          placeholder="Search name or handle…"
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
         />
@@ -131,10 +130,12 @@ export default function ProgramsPage(): ReactNode {
         ) : visible.length === 0 ? (
           <p className="desc">
             {total === 0
-              ? "No programs tracked yet."
+              ? query.trim()
+                ? "No programs match your search."
+                : "No programs tracked yet."
               : watchedOnly
-                ? "None of your watched programs are on this page."
-                : "No matches on this page."}
+                ? "None of your watched programs match this search."
+                : "No matches."}
           </p>
         ) : (
           <table className="table">
@@ -179,7 +180,12 @@ export default function ProgramsPage(): ReactNode {
           {page > 1 ? (
             <>
               {" "}
-              <button type="button" onClick={() => void loadPage(page - 1)}>
+              <button
+                type="button"
+                onClick={() =>
+                  void loadPage(page - 1, query.trim() ? query.trim() : undefined)
+                }
+              >
                 Previous
               </button>
             </>
@@ -187,7 +193,12 @@ export default function ProgramsPage(): ReactNode {
           {page < pages ? (
             <>
               {" "}
-              <button type="button" onClick={() => void loadPage(page + 1)}>
+              <button
+                type="button"
+                onClick={() =>
+                  void loadPage(page + 1, query.trim() ? query.trim() : undefined)
+                }
+              >
                 Next
               </button>
             </>

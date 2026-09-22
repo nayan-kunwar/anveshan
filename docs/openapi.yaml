@@ -27,6 +27,12 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
+        - name: q
+          in: query
+          description: Case-insensitive substring filter on name and handle (externalId). Empty/missing returns all programs.
+          schema:
+            type: string
+            maxLength: 100
       responses:
         "200":
           description: Program list

@@ -43,6 +43,7 @@ export interface ProgramStore {
   listPrograms(
     page: number,
     pageSize: number,
+    q?: string,
   ): Promise<{ items: ProgramRow[]; total: number }>;
   findProgramById(id: string): Promise<ProgramRow | undefined>;
   listAssets(

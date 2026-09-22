@@ -8,6 +8,7 @@ const pageSizeSchema = (def: number): z.ZodDefault<z.ZodNumber> =>
 export const programsQuerySchema = z.object({
   page: pageSchema,
   pageSize: pageSizeSchema(25),
+  q: z.string().trim().max(100).optional(),
 });
 
 export type ProgramsQuery = z.infer<typeof programsQuerySchema>;
