@@ -70,6 +70,8 @@ describe("loadConfig", () => {
     const config = loadConfig({ ...baseEnv });
     expect(config.NOTIFICATIONS_ENABLED).toBe(false);
     expect(config.AUTH_EMAIL_ENABLED).toBeUndefined();
+    expect(config.MAIL_PROVIDER).toBe("smtp");
+    expect(config.BREVO_API_KEY).toBeUndefined();
     expect(config.DIGEST_TICK_CRON).toBe("* * * * *");
     expect(config.IMMEDIATE_EMAIL_CAP).toBe(20);
     expect(config.ASSET_EMAIL_CAP).toBe(10);
@@ -81,15 +83,19 @@ describe("loadConfig", () => {
   it("treats blank SMTP and secret values as unset", () => {
     const config = loadConfig({
       ...baseEnv,
+      MAIL_PROVIDER: "",
       SMTP_HOST: "",
       SMTP_USER: "",
       SMTP_PASS: "",
+      BREVO_API_KEY: "",
       MAGIC_LINK_SECRET: "",
       SESSION_SECRET: "",
       UNSUBSCRIBE_SECRET: "",
       AUTH_EMAIL_ENABLED: "",
     });
+    expect(config.MAIL_PROVIDER).toBe("smtp");
     expect(config.SMTP_HOST).toBeUndefined();
+    expect(config.BREVO_API_KEY).toBeUndefined();
     expect(config.MAGIC_LINK_SECRET).toBeUndefined();
     expect(config.AUTH_EMAIL_ENABLED).toBeUndefined();
   });
@@ -106,6 +112,33 @@ describe("loadConfig", () => {
         }),
       ),
     ).toBe(true);
+  });
+
+  it("derives AUTH_EMAIL_ENABLED from BREVO_API_KEY when MAIL_PROVIDER=brevo", () => {
+    expect(
+      isAuthEmailEnabled(loadConfig({ ...baseEnv, MAIL_PROVIDER: "brevo" })),
+    ).toBe(false);
+    expect(
+      isAuthEmailEnabled(
+        loadConfig({
+          ...baseEnv,
+          MAIL_PROVIDER: "brevo",
+          BREVO_API_KEY: "xkeysib-test",
+        }),
+      ),
+    ).toBe(true);
+    // SMTP vars alone do not enable auth email when provider is brevo
+    expect(
+      isAuthEmailEnabled(
+        loadConfig({
+          ...baseEnv,
+          MAIL_PROVIDER: "brevo",
+          SMTP_HOST: "smtp.example.com",
+          SMTP_USER: "u",
+          SMTP_PASS: "p",
+        }),
+      ),
+    ).toBe(false);
   });
 
   it("explicit AUTH_EMAIL_ENABLED wins over derivation", () => {

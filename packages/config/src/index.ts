@@ -38,14 +38,18 @@ export const envSchema = z.object({
   LOG_LEVEL: logLevelSchema.default("info"),
   H1_LIVE_TEST: z.string().optional(),
   // --- Milestone 2: notifications + magic-link auth ---
-  // SMTP is optional at boot (Gmail is local-only; production uses
-  // Resend/Postmark/SES). Auth secrets are optional at boot and
-  // fail-closed per endpoint via requireMagicLinkSecrets() etc.
+  // Mail transport is optional at boot. MAIL_PROVIDER selects the
+  // factory branch (smtp | brevo). Auth secrets are optional at boot
+  // and fail-closed per endpoint via requireMagicLinkSecrets() etc.
+  MAIL_PROVIDER: z.enum(["smtp", "brevo"]).default("smtp"),
   SMTP_HOST: z.string().min(1).optional(),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
   SMTP_USER: z.string().min(1).optional(),
   SMTP_PASS: z.string().min(1).optional(),
+  // Shared From for every provider (Brevo sender.email / SMTP From).
   SMTP_FROM: z.string().email().optional(),
+  BREVO_API_KEY: z.string().min(1).optional(),
+  BREVO_API_URL: z.string().url().optional(),
   MAGIC_LINK_SECRET: z.string().min(16).optional(),
   MAGIC_LINK_EXPIRY: z.coerce.number().int().positive().default(900000),
   SESSION_SECRET: z.string().min(16).optional(),
@@ -110,11 +114,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   for (const key of [
     "HACKERONE_USERNAME",
     "HACKERONE_API_TOKEN",
+    "MAIL_PROVIDER",
     "SMTP_HOST",
     "SMTP_PORT",
     "SMTP_USER",
     "SMTP_PASS",
     "SMTP_FROM",
+    "BREVO_API_KEY",
+    "BREVO_API_URL",
     "MAGIC_LINK_SECRET",
     "SESSION_SECRET",
     "UNSUBSCRIBE_SECRET",
@@ -183,10 +190,13 @@ export function requireUnsubscribeSecret(config: AppConfig): string {
 
 /**
  * Magic-link send gate. Explicit AUTH_EMAIL_ENABLED wins; otherwise
- * derived (true only when SMTP_HOST + SMTP_USER + SMTP_PASS are set).
+ * derived from the selected provider's credentials:
+ * - brevo: BREVO_API_KEY set
+ * - smtp:  SMTP_HOST + SMTP_USER + SMTP_PASS set
  * Independent of NOTIFICATIONS_ENABLED.
  */
 export function isAuthEmailEnabled(config: AppConfig): boolean {
   if (config.AUTH_EMAIL_ENABLED !== undefined) return config.AUTH_EMAIL_ENABLED;
+  if (config.MAIL_PROVIDER === "brevo") return Boolean(config.BREVO_API_KEY);
   return Boolean(config.SMTP_HOST && config.SMTP_USER && config.SMTP_PASS);
 }
