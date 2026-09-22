@@ -49,6 +49,7 @@ your domain → rewrite → API), so no CORS setup is needed.
 | `SMTP_FROM`                               | Yes for real mail               | Shared From for SMTP and Brevo (verified sender)               |
 | `BREVO_API_KEY`                           | Yes when `MAIL_PROVIDER=brevo`  | Brevo account API key (`xkeysib-…`)                            |
 | `BREVO_API_URL`                           | No                              | Default `https://api.brevo.com/v3`                             |
+| `MAIL_SEND_TIMEOUT_MS`                    | No (`30000`)                    | Per-send budget; raise if SMTP is slow                         |
 | `NOTIFICATIONS_ENABLED`                     | Yes for change mail             | Default `false` = outbox never enqueues/drains                                      |
 | `HACKERONE_USERNAME`, `HACKERONE_API_TOKEN` | Yes for collection              | Every collection run fails closed without them                                      |
 | `PORT`, `LOG_LEVEL`                         | No (`3000`, `info`)             | Match the host's expected port if required                                          |
@@ -105,6 +106,6 @@ already honours it).
 | `401 UNAUTHORIZED` / `INVALID_TOKEN` on auth endpoints | Secrets missing (fail-closed by design)                                                                 | Set the three `*_SECRET` vars, restart API                    |
 | No change mail, worker log says `disabled`             | `NOTIFICATIONS_ENABLED` unset/false                                                                     | Set `true`, restart API                                       |
 | No mail at all, magic link included                    | Wrong `MAIL_PROVIDER` / missing provider creds (`AUTH_EMAIL_ENABLED` derives false) | Set provider + matching vars (`brevo` → `BREVO_API_KEY`; `smtp` → `SMTP_*`) |
-| Magic link times out (`SMTP send timed out`)          | SMTP host unreachable from host (common with Gmail on cloud)                    | Switch to `MAIL_PROVIDER=brevo` + verified sender               |
+| Magic link times out (`SMTP send timed out`)          | SMTP host unreachable from host (common with Gmail on cloud)                    | Prefer `MAIL_PROVIDER=brevo`; or raise `MAIL_SEND_TIMEOUT_MS` if path is merely slow |
 | Emails link to localhost                               | Stale `FRONTEND_URL`                                                                                    | Update to Vercel URL, restart API (links render at send time) |
 | New deploy didn't pick up API URL change               | Rewrites bake `API_INTERNAL_URL` at build                                                               | Redeploy the frontend after changing the variable             |

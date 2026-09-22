@@ -21,7 +21,7 @@ deliveryWorker (setInterval, every 30s; no-op if NOTIFICATIONS_ENABLED=false)
     (process crash only; mutex means in-flight SMTP is never reset)
   claim 50 rows (FOR UPDATE SKIP LOCKED)
   re-check user; reload changes (run id or digest window); re-filter
-  render email → nodemailer (10s timeout) → sent / skipped / failed / retry
+  render email → nodemailer (30s timeout) → sent / skipped / failed / retry
         │
         ▼
 dailyTickCron (every minute, DIGEST_TICK_CRON)
@@ -214,9 +214,9 @@ POST /api/v1/auth/request-magic-link  { email }
   4. Invalidate unconsumed tokens for this user
   5. Hash raw token with HMAC-SHA256(MAGIC_LINK_SECRET)
   6. Insert magic_link_tokens (expires 15min)
-  7. If isAuthEmailEnabled(): send magic-link email (nodemailer timeout 10s)
-     On timeout/error: log, do not throw to the client
-     Else: skip SMTP (tests / AUTH_EMAIL_ENABLED=false)
+   7. If isAuthEmailEnabled(): send magic-link email (mail timeout MAIL_SEND_TIMEOUT_MS)
+      On timeout/error: log, do not throw to the client
+      Else: skip SMTP (tests / AUTH_EMAIL_ENABLED=false)
   8. Always return 200 (no email oracle), even when mail is not sent
 
 POST /api/v1/auth/verify  { token }
@@ -458,8 +458,8 @@ Every 30 seconds:
   finally:
     draining = false
 
-SMTP timeout is 10s for change mail (same transport as magic-link).
-A hung send must not last 10 minutes.
+SMTP timeout defaults to 30s for change mail (same transport as magic-link;
+override with MAIL_SEND_TIMEOUT_MS). A hung send must not last 10 minutes.
 
 1. Stale recovery — **process crash only**. With the mutex, an in-flight
    send is never `sending` for 10 minutes in a live process.
@@ -503,7 +503,7 @@ A hung send must not last 10 minutes.
                            to the digest_on 08:00 UTC derivation)
          (same window as enqueue; join programs for names)
       → if no changes pass: SET status = 'skipped', updated_at = now()
-   c. Render email → send via nodemailer (10s timeout)
+   c. Render email → send via nodemailer (30s timeout)
       → success: SET status = 'sent', sent_at = now(), updated_at = now()
       → failure: SET status = 'pending',
                        next_attempt_at = now() + (attempts^2 * 60s),
@@ -668,6 +668,8 @@ SMTP_FROM=noreply@anveshan.dev
 # Brevo HTTP API (MAIL_PROVIDER=brevo)
 BREVO_API_KEY=
 BREVO_API_URL=https://api.brevo.com/v3
+# Per-send budget (ms); default 30000
+MAIL_SEND_TIMEOUT_MS=30000
 
 # Auth secrets (optional at boot; fail-closed per endpoint, not as one bundle)
 MAGIC_LINK_SECRET=<random-32-chars>
@@ -771,11 +773,11 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 5. Repository queries (user, session, token, subscription, watch, delivery)
 6. Auth routes (request-magic-link, verify, me, logout) **including**
    the per-IP + per-email rate limiter on request-magic-link
-   and 10s SMTP timeout on magic-link send
+   and mail-send timeout on magic-link send (MAIL_SEND_TIMEOUT_MS)
 7. Session middleware (requireSession; SESSION_SECRET; reject expired)
 8. Subscription + watch routes
-9. Notifications package (SMTP transport, 10s timeout on all sends,
-   renderImmediate + renderDaily, pure)
+9. Notifications package (SMTP transport, configurable send timeout,
+    renderImmediate + renderDaily, pure)
 10. Enqueue logic (immediate + daily, load changes once, idempotent)
 11. Catch-up (`catchUpImmediate`, `catchUpDailyDigest`; eligibility now)
 12. Delivery worker (drain mutex, claim CTE, stale recovery decrements
@@ -831,7 +833,7 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 | Enqueue throw is caught; collection summary stays completed                 | Isolation                              |
 | Magic-link SMTP timeout still returns 200                                   | No email oracle                        |
 | Overlapping worker tick while draining → second tick no-ops                 | Drain mutex, no double-send            |
-| Change-mail SMTP uses 10s timeout                                           | Hung send cannot hit stale recovery    |
+| Change-mail SMTP uses configurable timeout (default 30s)                     | Hung send cannot hit stale recovery    |
 | User switched to daily; catch-up may insert a digest for the last closes    | Catch-up uses current eligibility      |
 
 ---
@@ -841,11 +843,8 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 | File                                        | Purpose                                                          |
 | ------------------------------------------- | ---------------------------------------------------------------- |
 | `packages/notifications/src/index.ts`       | Public API                                                       |
-| `packages/notifications/src/smtp.ts`        | nodemailer transport (10s send timeout)                          |
-| `packages/notifications/src/brevo.ts`       | Brevo HTTP transport (fetch + 10s timeout)                       |
-| `packages/notifications/src/mailer.ts`      | `createMailer` factory (`MAIL_PROVIDER` → transport)             |
-| `packages/notifications/src/brevo.ts`       | Brevo HTTP transport (fetch + 10s timeout)                       |
-| `packages/notifications/src/mailer.ts`      | `createMailer` factory (`MAIL_PROVIDER` → transport)             |
+| `packages/notifications/src/smtp.ts`        | nodemailer transport (configurable send timeout)             |
+| `packages/notifications/src/brevo.ts`       | Brevo HTTP transport (fetch + configurable timeout)          |
 | `packages/notifications/src/templates.ts`   | renderImmediate, renderDaily (pure)                              |
 | `packages/notifications/src/digest-time.ts` | per-user close math: lastClose, nextClose (pure, Intl only)      |
 | `apps/api/src/auth/routes.ts`               | request-magic-link, verify, me, logout                           |

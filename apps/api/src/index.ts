@@ -29,6 +29,7 @@ async function main(): Promise<void> {
     sendMail = createMailer({
       provider: config.MAIL_PROVIDER,
       from: config.SMTP_FROM,
+      timeoutMs: config.MAIL_SEND_TIMEOUT_MS,
       smtp: config.SMTP_HOST
         ? {
             host: config.SMTP_HOST,

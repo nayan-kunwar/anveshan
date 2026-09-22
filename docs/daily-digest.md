@@ -40,7 +40,7 @@ per-minute tick (DIGEST_TICK_CRON, default `* * * * *`)
         │
         ▼
 delivery worker (every 30s)
-  catch-up → stale recovery → claim (≤50) → send via SMTP (10s timeout)
+  catch-up → stale recovery → claim (≤50) → send via SMTP (30s timeout)
   → sent / skipped / failed (3 attempts, quadratic backoff)
 ```
 
