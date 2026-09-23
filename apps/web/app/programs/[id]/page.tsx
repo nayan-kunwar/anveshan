@@ -373,9 +373,12 @@ export default function ProgramDetailPage(): ReactNode {
           style={{ maxWidth: 900, margin: "0 auto", padding: "1rem" }}
         >
           <div className="brand">
-            Anveshan<span>.</span>
+            <Link href="/">
+              Anveshan<span>.</span>
+            </Link>
           </div>
           <div className="topbar-right">
+            <Link href="/programs">Programs</Link>
             <Link href="/login">Sign in</Link>
           </div>
         </div>

@@ -2,27 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { me } from "./lib/api";
+import ProgramCatalog from "./components/ProgramCatalog";
 import ThemeToggle from "./components/ThemeToggle";
-
-async function fetchProgramTotal(): Promise<number | null> {
-  try {
-    const res = await fetch("/api/v1/programs?page=1&pageSize=1");
-    if (!res.ok) return null;
-    const body = (await res.json()) as {
-      pagination?: { total?: unknown };
-    };
-    return typeof body.pagination?.total === "number" ? body.pagination.total : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function Home(): ReactNode {
   const router = useRouter();
-  const [total, setTotal] = useState<number | null>(null);
 
   useEffect(() => {
     me()
@@ -32,9 +19,6 @@ export default function Home(): ReactNode {
       .catch(() => {
         // Visitor: stay on the landing page.
       });
-    void fetchProgramTotal().then((n) => {
-      if (n !== null) setTotal(n);
-    });
   }, [router]);
 
   return (
@@ -44,10 +28,13 @@ export default function Home(): ReactNode {
         style={{ maxWidth: 900, margin: "0 auto", padding: "1rem" }}
       >
         <div className="brand">
-          Anveshan<span>.</span>
+          <Link href="/">
+            Anveshan<span>.</span>
+          </Link>
         </div>
         <div className="topbar-right">
           <ThemeToggle />
+          <Link href="/programs">Programs</Link>
           <Link href="/login">Sign in</Link>
         </div>
       </div>
@@ -58,14 +45,18 @@ export default function Home(): ReactNode {
         <p>
           Anveshan tracks bug-bounty programs and emails you the moment in-scope assets
           change.
-          {total !== null ? ` Currently tracking ${total} programs.` : null}
         </p>
         <div className="cta">
           <Link href="/login" className="primary">
             Get notified
           </Link>
-          <Link href="/login">Sign in</Link>
+          <a href="#programs">Browse programs</a>
         </div>
+      </div>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 1rem" }}>
+        <section id="programs">
+          <ProgramCatalog user={null} />
+        </section>
       </div>
       <div
         className="features"

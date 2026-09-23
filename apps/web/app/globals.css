@@ -475,6 +475,22 @@ table.table tr:last-child td {
   border-bottom: none;
 }
 
+.table-wrap {
+  overflow-x: auto;
+}
+
+.pill {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  white-space: nowrap;
+}
+
 /* Landing page. */
 .hero {
   text-align: center;
