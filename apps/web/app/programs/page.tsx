@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { logout, me } from "../lib/api";
 import type { User } from "../lib/api";
 import ProgramCatalog from "../components/ProgramCatalog";
+import PublicNav from "../components/PublicNav";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 
@@ -37,21 +37,8 @@ export default function ProgramsPage(): ReactNode {
   if (!user) {
     return (
       <>
-        <div
-          className="topbar"
-          style={{ maxWidth: 900, margin: "0 auto", padding: "1rem" }}
-        >
-          <div className="brand">
-            <Link href="/">
-              Anveshan<span>.</span>
-            </Link>
-          </div>
-          <div className="topbar-right">
-            <Link href="/programs">Programs</Link>
-            <Link href="/login">Sign in</Link>
-          </div>
-        </div>
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 1rem 2rem" }}>
+        <PublicNav />
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 1rem 2rem" }}>
           {body}
         </div>
       </>

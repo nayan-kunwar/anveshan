@@ -119,7 +119,7 @@ a {
   flex: 1;
   min-width: 0;
   padding: 1.5rem 2rem 3rem;
-  max-width: 1100px;
+  max-width: 1200px;
 }
 
 .topbar {
@@ -138,6 +138,79 @@ a {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+/* Public nav (landing, catalog, program detail for visitors). */
+.public-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+}
+
+.nav-link.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Use-case icon tile. */
+.icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 10px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  margin-bottom: 0.75rem;
+}
+
+.section-title {
+  text-align: center;
+  font-size: 1.5rem;
+  margin: 0.5rem 0 1.25rem;
+}
+
+/* Wide CTA banner. */
+.cta-banner {
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+}
+
+.cta-banner h2 {
+  font-size: 1.5rem;
+}
+
+.cta-banner .desc {
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.btn-accent {
+  display: inline-block;
+  text-decoration: none;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+  font-weight: 600;
+  padding: 0.7rem 1.5rem;
+  border-radius: 8px;
+}
+
+.btn-accent:hover {
+  background: var(--accent-hover);
 }
 
 .avatar {
