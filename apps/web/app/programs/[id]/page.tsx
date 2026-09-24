@@ -179,7 +179,11 @@ export default function ProgramDetailPage(): ReactNode {
         <h1>Program not found</h1>
         <p>No program exists with this id.</p>
         <p>
-          <Link href="/dashboard">Back to dashboard</Link>
+          {user ? (
+            <Link href="/dashboard">Back to dashboard</Link>
+          ) : (
+            <Link href="/programs">Back to programs</Link>
+          )}
         </p>
       </div>
     );
@@ -201,7 +205,11 @@ export default function ProgramDetailPage(): ReactNode {
   const body = (
     <>
       <p>
-        <Link href="/dashboard">← Back to dashboard</Link>
+        {user ? (
+          <Link href="/dashboard">← Back to dashboard</Link>
+        ) : (
+          <Link href="/programs">← Back to programs</Link>
+        )}
       </p>
 
       <div className="stats">
