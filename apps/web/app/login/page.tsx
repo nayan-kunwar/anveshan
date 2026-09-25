@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { ApiError, requestMagicLink } from "../lib/api";
+import AuthShell from "../components/AuthShell";
 
 interface SubmitEvent {
   preventDefault(): void;
@@ -30,34 +31,48 @@ export default function LoginPage(): ReactNode {
 
   if (sent) {
     return (
-      <div className="center">
-        <h1>Check your inbox</h1>
-        <p>
+      <AuthShell>
+        <p className="auth-eyebrow">Link sent</p>
+        <h1 className="auth-title">Check your inbox</h1>
+        <p className="auth-sub">
           A sign-in link is on its way to <strong>{email}</strong>. It expires in 15
           minutes.
         </p>
-      </div>
+        <button type="button" className="auth-link-btn" onClick={() => setSent(false)}>
+          Use a different email
+        </button>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="center">
-      <h1>Sign in</h1>
-      <p className="small">Enter your email to receive a one-time sign-in link.</p>
+    <AuthShell>
+      <p className="auth-eyebrow">Welcome back</p>
+      <h1 className="auth-title">Sign in</h1>
+      <p className="auth-sub">
+        Enter your email and we&apos;ll send a one-time sign-in link.
+      </p>
       <form onSubmit={(event) => void onSubmit(event)}>
-        <input
-          type="email"
-          required
-          maxLength={320}
-          placeholder="you@example.com"
-          value={email}
-          onChange={(event) => setEmail(event.currentTarget.value)}
-        />
-        <button type="submit" className="primary" disabled={busy}>
+        <div className="auth-field">
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            required
+            maxLength={320}
+            placeholder="you@example.com"
+            value={email}
+            onChange={(event) => setEmail(event.currentTarget.value)}
+          />
+        </div>
+        <button type="submit" className="auth-btn" disabled={busy}>
           {busy ? "Sending…" : "Send sign-in link"}
         </button>
       </form>
-      {error ? <p className="error">{error}</p> : null}
-    </div>
+      {error ? <p className="error auth-error">{error}</p> : null}
+      <p className="auth-alt">
+        New to Anveshan? Sign in — your account is created automatically on first sign-in.
+      </p>
+    </AuthShell>
   );
 }

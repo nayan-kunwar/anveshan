@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { ApiError, verifyMagicLink } from "../../lib/api";
+import AuthShell from "../../components/AuthShell";
 
 function CallbackInner(): ReactNode {
   const params = useSearchParams();
@@ -27,17 +29,22 @@ function CallbackInner(): ReactNode {
 
   if (error) {
     return (
-      <div className="center">
-        <h1>Sign-in failed</h1>
-        <p className="error">{error}</p>
-        <p className="small">Links expire after 15 minutes and work only once.</p>
-      </div>
+      <AuthShell>
+        <p className="auth-eyebrow">Authentication error</p>
+        <h1 className="auth-title">Sign-in failed</h1>
+        <p className="error auth-error">{error}</p>
+        <p className="auth-note">Links expire after 15 minutes and work only once.</p>
+        <Link href="/login">Back to sign in</Link>
+      </AuthShell>
     );
   }
   return (
-    <div className="center">
-      <h1>Signing you in…</h1>
-    </div>
+    <AuthShell>
+      <div className="auth-center" role="status">
+        <div className="auth-spinner" aria-hidden="true" />
+        <h1 className="auth-title">Signing you in…</h1>
+      </div>
+    </AuthShell>
   );
 }
 
