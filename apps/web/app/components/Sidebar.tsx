@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import RadarLogo from "./RadarLogo";
 
 export default function Sidebar({
   email,
@@ -12,7 +13,10 @@ export default function Sidebar({
 }): ReactNode {
   return (
     <aside className="sidebar">
-      <div className="brand">Anveshan</div>
+      <div className="brand">
+        <RadarLogo size={24} />
+        Anveshan
+      </div>
       <nav className="nav">
         <Link href="/dashboard" className={active === "dashboard" ? "active" : undefined}>
           Dashboard

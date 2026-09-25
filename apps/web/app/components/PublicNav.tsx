@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import RadarLogo from "./RadarLogo";
 import ThemeToggle from "./ThemeToggle";
 
 const LINKS = [
@@ -18,7 +19,10 @@ export default function PublicNav(): ReactNode {
       style={{ maxWidth: 1200, margin: "0 auto", padding: "1rem" }}
     >
       <div className="brand">
-        <Link href="/">Anveshan</Link>
+        <Link href="/">
+          <RadarLogo size={24} />
+          Anveshan
+        </Link>
       </div>
       <div className="topbar-right">
         {LINKS.map((link) => (
