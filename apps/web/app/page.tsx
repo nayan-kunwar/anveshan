@@ -105,9 +105,7 @@ export default function Home(): ReactNode {
     <>
       <PublicNav />
       <div className="hero">
-        <h1>
-          Never miss a scope change<span>.</span>
-        </h1>
+        <h1>Never miss a scope change</h1>
         <p>
           Anveshan tracks bug-bounty programs and emails you the moment in-scope assets
           change.
@@ -131,7 +129,9 @@ export default function Home(): ReactNode {
             <span className="icon-tile">{useCase.icon}</span>
             <h2>{useCase.title}</h2>
             <p className="desc">{useCase.desc}</p>
-            <Link href={useCase.href}>{useCase.action} →</Link>
+            <Link href={useCase.href} className="card-link">
+              {useCase.action} →
+            </Link>
           </div>
         ))}
       </div>

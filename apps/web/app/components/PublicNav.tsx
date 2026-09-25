@@ -18,9 +18,7 @@ export default function PublicNav(): ReactNode {
       style={{ maxWidth: 1200, margin: "0 auto", padding: "1rem" }}
     >
       <div className="brand">
-        <Link href="/">
-          Anveshan<span>.</span>
-        </Link>
+        <Link href="/">Anveshan</Link>
       </div>
       <div className="topbar-right">
         {LINKS.map((link) => (

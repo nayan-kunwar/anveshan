@@ -12,9 +12,7 @@ export default function Sidebar({
 }): ReactNode {
   return (
     <aside className="sidebar">
-      <div className="brand">
-        Anveshan<span>.</span>
-      </div>
+      <div className="brand">Anveshan</div>
       <nav className="nav">
         <Link href="/dashboard" className={active === "dashboard" ? "active" : undefined}>
           Dashboard
