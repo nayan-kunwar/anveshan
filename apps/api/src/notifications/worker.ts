@@ -17,6 +17,7 @@ import {
 import type { SendMailFn, TemplateChange } from "@anveshan/notifications";
 import { renderDaily, renderImmediate } from "@anveshan/notifications";
 import { signUnsubscribe } from "../auth/tokens.js";
+import { createActiveRuns, type StopHandle } from "../stoppable.js";
 import type { Logger } from "pino";
 import cron from "node-cron";
 import {
@@ -210,10 +211,11 @@ export interface DigestCronDeps {
 
 /**
  * Per-minute digest tick. Enqueues digests for daily users whose personal
- * close just passed. No-op when disabled. Returns the task, or null when
- * disabled (same convention as the collection scheduler).
+ * close just passed. No-op when disabled. Returns a stop handle that stops
+ * the cron and awaits the in-flight tick (bounded), or null when disabled
+ * (same convention as the collection scheduler).
  */
-export function startDigestCron(deps: DigestCronDeps): cron.ScheduledTask | null {
+export function startDigestCron(deps: DigestCronDeps): StopHandle | null {
   const { config, logger } = deps;
   if (!config.NOTIFICATIONS_ENABLED) {
     logger.info("digest cron disabled (NOTIFICATIONS_ENABLED=false)");
@@ -222,51 +224,65 @@ export function startDigestCron(deps: DigestCronDeps): cron.ScheduledTask | null
   if (!cron.validate(config.DIGEST_TICK_CRON)) {
     throw new Error(`Invalid DIGEST_TICK_CRON expression: ${config.DIGEST_TICK_CRON}`);
   }
+  const active = createActiveRuns();
   const task = cron.schedule(
     config.DIGEST_TICK_CRON,
     () => {
-      void (async () => {
-        try {
-          await enqueueDueDigests({
-            db: deps.db,
-            config: deps.config,
-            logger: deps.logger,
-          });
-        } catch (error) {
+      active.track(
+        enqueueDueDigests({
+          db: deps.db,
+          config: deps.config,
+          logger: deps.logger,
+        }).catch((error: unknown) => {
           logger.error({ err: error }, "digest enqueue crashed");
-        }
-      })();
+        }),
+      );
     },
     { timezone: "UTC" },
   );
   logger.info({ cron: config.DIGEST_TICK_CRON }, "digest cron started");
-  return task;
+  return {
+    stop: async (): Promise<void> => {
+      task.stop();
+      await active.waitAll();
+    },
+  };
 }
 
 export interface DeliveryIntervalDeps extends WorkerDeps {
   intervalMs?: number | undefined;
 }
 
-/** setInterval drain loop. Returns a stop handle. No-op when disabled. */
-export function startDeliveryInterval(
-  deps: DeliveryIntervalDeps,
-): { stop: () => void } | null {
+/**
+ * setInterval drain loop. Returns a stop handle: clears the interval
+ * (no new ticks) and awaits the in-flight drain, bounded by
+ * STOP_TIMEOUT_MS so shutdown can never hang. No-op when disabled.
+ */
+export function startDeliveryInterval(deps: DeliveryIntervalDeps): StopHandle | null {
   if (!deps.config.NOTIFICATIONS_ENABLED) {
     deps.logger.info("delivery worker disabled (NOTIFICATIONS_ENABLED=false)");
     return null;
   }
   const worker = createDeliveryWorker(deps);
+  const active = createActiveRuns();
+  const tick = (crashMessage: string): void => {
+    active.track(
+      worker.drain().catch((error: unknown) => {
+        deps.logger.error({ err: error }, crashMessage);
+      }),
+    );
+  };
   // Boot catch-up on start (first drain runs catch-up before claiming).
-  worker.drain().catch((error: unknown) => {
-    deps.logger.error({ err: error }, "initial delivery drain crashed");
-  });
-  const timer = setInterval(() => {
-    worker.drain().catch((error: unknown) => {
-      deps.logger.error({ err: error }, "delivery drain crashed");
-    });
-  }, deps.intervalMs ?? 30_000);
+  tick("initial delivery drain crashed");
+  const timer = setInterval(
+    () => tick("delivery drain crashed"),
+    deps.intervalMs ?? 30_000,
+  );
   timer.unref();
   return {
-    stop: () => clearInterval(timer),
+    stop: async (): Promise<void> => {
+      clearInterval(timer);
+      await active.waitAll();
+    },
   };
 }

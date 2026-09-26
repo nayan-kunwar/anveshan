@@ -45,12 +45,12 @@ async function main(): Promise<void> {
     });
   }
 
-  startScheduler({ config, pool, logger });
+  const collectionTask = startScheduler({ config, pool, logger });
 
   // Milestone 2: delivery worker (outbox drain) + daily digest cron.
   // Both no-op when NOTIFICATIONS_ENABLED=false.
-  startDeliveryInterval({ db, config, logger, sendMail });
-  startDigestCron({ db, config, logger });
+  const deliveryWorker = startDeliveryInterval({ db, config, logger, sendMail });
+  const digestTask = startDigestCron({ db, config, logger });
 
   const app = createApp({
     store: createDrizzleProgramStore(db),
@@ -64,8 +64,24 @@ async function main(): Promise<void> {
     logger.info({ port: config.PORT }, "anveshan api listening");
   });
 
+  let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     logger.info({ signal }, "shutting down");
+    // Safety net: a stuck socket or worker must not hang exit forever.
+    const forceTimer = setTimeout(() => {
+      logger.warn({ signal }, "shutdown timed out; forcing exit");
+      process.exit(1);
+    }, 10_000);
+    forceTimer.unref();
+    // 1. Stop new background work, 2. await in-flight work (bounded, parallel).
+    await Promise.all([
+      collectionTask?.stop() ?? Promise.resolve(),
+      deliveryWorker?.stop() ?? Promise.resolve(),
+      digestTask?.stop() ?? Promise.resolve(),
+    ]);
+    // 3. Close the HTTP server, 4. close the pool, 5. exit.
     server.close(() => {
       void (async () => {
         await closePool();

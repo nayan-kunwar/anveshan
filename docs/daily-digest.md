@@ -97,8 +97,10 @@ repeats hit `ON CONFLICT DO NOTHING`). Consequences:
    `last_error` after 3 attempts).
 4. API terminal: look for `digest enqueue crashed` /
    `delivery drain crashed` — most often `ECONNREFUSED`, i.e. Postgres
-   unreachable, not a code bug. `pending` rows drain on their own once
-   the database is back; no restart or re-enqueue needed.
+   unreachable, not a code bug. It can also appear once per deploy or
+   hibernation if a drain was mid-query at shutdown (workers now stop
+   and drain before the pool closes). `pending` rows drain on their own
+   once the database is back; no restart or re-enqueue needed.
 5. Dev shortcut (synthetic change + real send):
    `pnpm mail:test -- --email you@yopmail.com --yes`
    (daily path aligns your close to now; your real prefs are restored
