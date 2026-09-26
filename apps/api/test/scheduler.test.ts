@@ -27,10 +27,10 @@ describe("startScheduler", () => {
     );
   });
 
-  it("starts and stops a scheduled task", () => {
+  it("starts and stops a scheduled task", async () => {
     const config = configWith({ COLLECTION_CRON: "*/30 * * * *" });
     const task = startScheduler({ config, pool, logger });
     expect(task).not.toBeNull();
-    task?.stop();
+    await task?.stop();
   });
 });

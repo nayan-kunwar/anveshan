@@ -32,7 +32,10 @@ import {
   enqueueImmediate,
   filterChanges,
 } from "../src/notifications/enqueue.js";
-import { createDeliveryWorker } from "../src/notifications/worker.js";
+import {
+  createDeliveryWorker,
+  startDeliveryInterval,
+} from "../src/notifications/worker.js";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Pool, PoolClient } from "pg";
 
@@ -676,5 +679,37 @@ describe("delivery worker", () => {
     expect(final.every((s) => s === "failed")).toBe(true);
     expect(mailTo(user.email)).toEqual([]);
     expect(runId).toBeDefined();
+  });
+
+  it("stop() awaits the in-flight drain and prevents further ticks", async () => {
+    if (!db) return;
+    const { db: database, config: cfg } = needDeps();
+    const programId = await makeProgram("drainstop");
+    const user = await makeUser("drain-f@example.com", {
+      frequency: "immediate",
+      watchNewPrograms: false,
+      watchAllPrograms: true,
+    });
+    const runId = await makeRunWithChanges(programId, ["ASSET_ADDED"]);
+    await enqueueImmediate({ db: database, config: cfg, logger: logger() }, runId);
+    const slowMail = async (m: MailMessage): Promise<void> => {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      await createFakeSendMail(sent)(m);
+    };
+    const handle = startDeliveryInterval({
+      ...workerDeps(slowMail),
+      intervalMs: 25,
+    });
+    expect(handle).not.toBeNull();
+    await handle?.stop();
+    // The boot drain finished during stop(): the enqueued row is sent.
+    const statuses = await deliveriesFor(user.userId);
+    expect(statuses.length).toBeGreaterThanOrEqual(1);
+    expect(statuses.every((s) => s === "sent")).toBe(true);
+    // No ticks fire after stop(): the mailbox stays frozen.
+    const frozen = mailTo(user.email).length;
+    expect(frozen).toBeGreaterThanOrEqual(1);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(mailTo(user.email)).toHaveLength(frozen);
   });
 });
