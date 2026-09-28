@@ -10,7 +10,8 @@ export type ErrorCode =
   | "TIMEOUT"
   | "UNAUTHORIZED"
   | "INVALID_TOKEN"
-  | "EMAIL_RATE_LIMITED";
+  | "EMAIL_RATE_LIMITED"
+  | "SCHEDULER_DISABLED";
 
 export class AppError extends Error {
   readonly code: ErrorCode;
@@ -61,6 +62,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   UNAUTHORIZED: 401,
   INVALID_TOKEN: 401,
   EMAIL_RATE_LIMITED: 429,
+  SCHEDULER_DISABLED: 409,
 };
 
 export function statusFor(code: ErrorCode): number {

@@ -319,6 +319,27 @@ export const notificationDeliveries = pgTable(
 export type DeliveryRow = typeof notificationDeliveries.$inferSelect;
 export type NewDeliveryRow = typeof notificationDeliveries.$inferInsert;
 
+/**
+ * Admin-controlled background-job settings (one row per job key;
+ * `collection` is the only key today — `digest`/`delivery` can reuse
+ * this table later with no migration).
+ *
+ * Semantics: **row absent = environment drives the job**
+ * (COLLECTION_ENABLED / COLLECTION_CRON / COLLECTION_TZ). A present
+ * row overrides the env values until it is deleted again. See
+ * docs/background-jobs.md §4.
+ */
+export const schedulerSettings = pgTable("scheduler_settings", {
+  jobKey: text("job_key").primaryKey(),
+  enabled: boolean("enabled").notNull(),
+  cron: text("cron").notNull(),
+  timezone: text("timezone").notNull().default("UTC"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type SchedulerSettingRow = typeof schedulerSettings.$inferSelect;
+export type NewSchedulerSettingRow = typeof schedulerSettings.$inferInsert;
+
 export const schema = {
   programs,
   assets,
@@ -332,4 +353,5 @@ export const schema = {
   subscriptions,
   watches,
   notificationDeliveries,
+  schedulerSettings,
 };

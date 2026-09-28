@@ -465,6 +465,110 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/RunNotFound"
+  /api/v1/admin/scheduler:
+    get:
+      summary: Get collection scheduler status (admin key required)
+      description: >
+        Effective scheduler state. source=environment means no
+        scheduler_settings row exists and COLLECTION_* env values drive
+        the job; source=database means a row overrides the env until it
+        is DELETEd. running reflects the newest collection run (any
+        trigger source).
+      parameters:
+        - name: X-Admin-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Scheduler status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SchedulerStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      summary: Start, stop, or reschedule the collection scheduler (admin key required)
+      description: >
+        Persists the settings (upserting scheduler_settings, which then
+        overrides COLLECTION_* env until DELETEd) and applies them
+        immediately — no restart. Omitted fields resolve from the
+        existing row, then the environment. Cron is 5-field
+        (minute-first); seconds expressions are rejected. Rejected with
+        409 while COLLECTION_ENABLED=false (env kill switch).
+      parameters:
+        - name: X-Admin-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                enabled:
+                  type: boolean
+                cron:
+                  type: string
+                  example: "*/5 * * * *"
+                timezone:
+                  type: string
+                  example: UTC
+      responses:
+        "200":
+          description: Applied scheduler status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SchedulerStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/SchedulerDisabled"
+    delete:
+      summary: Reset the collection scheduler to environment config (admin key required)
+      description: >
+        Removes the scheduler_settings row and immediately restarts the
+        scheduler from COLLECTION_ENABLED / COLLECTION_CRON /
+        COLLECTION_TZ. Rejected with 409 while
+        COLLECTION_ENABLED=false (env kill switch).
+      parameters:
+        - name: X-Admin-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Environment-driven scheduler status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SchedulerStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/SchedulerDisabled"
   /api/v1/unsubscribe:
     post:
       summary: Global unsubscribe via signed link token (no login)
@@ -719,6 +823,42 @@ components:
         errorMessage:
           type: string
           nullable: true
+    SchedulerStatus:
+      type: object
+      required: [enabled, source, cron, timezone, running, lastRun]
+      properties:
+        enabled:
+          type: boolean
+        source:
+          type: string
+          enum: [database, environment]
+        cron:
+          type: string
+          example: "*/30 * * * *"
+        timezone:
+          type: string
+          example: UTC
+        running:
+          type: boolean
+          description: Newest collection run is in flight
+        lastRun:
+          type: object
+          nullable: true
+          required: [id, status, startedAt, completedAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [running, completed, failed]
+            startedAt:
+              type: string
+              format: date-time
+            completedAt:
+              type: string
+              format: date-time
+              nullable: true
     Error:
       type: object
       required: [error]
@@ -743,6 +883,7 @@ components:
                   UNAUTHORIZED,
                   INVALID_TOKEN,
                   EMAIL_RATE_LIMITED,
+                  SCHEDULER_DISABLED,
                 ]
             message:
               type: string
@@ -761,6 +902,12 @@ components:
             $ref: "#/components/schemas/Error"
     RunNotFound:
       description: Collection run not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    SchedulerDisabled:
+      description: Scheduler is disabled by COLLECTION_ENABLED=false
       content:
         application/json:
           schema:

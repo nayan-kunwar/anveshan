@@ -9,8 +9,10 @@ import {
   createDb,
   createPool,
   createRun,
+  deleteSchedulerSetting,
   failStaleRunningRuns,
   findAssetsByProgram,
+  findSchedulerSetting,
   insertChange,
   listChanges,
   runMigrations,
@@ -18,6 +20,7 @@ import {
   tryAdvisoryLock,
   upsertAsset,
   upsertProgram,
+  upsertSchedulerSetting,
 } from "../src/index.js";
 import type { Database } from "../src/index.js";
 
@@ -151,5 +154,34 @@ describe("database repositories", () => {
     await advisoryUnlock(db);
     expect(await tryAdvisoryLock(db)).toBe(true);
     await advisoryUnlock(db);
+  });
+
+  it("upserts scheduler settings and deletes back to env-driven state", async () => {
+    if (!db) return;
+    expect(await findSchedulerSetting(db, "collection")).toBeUndefined();
+    const created = await upsertSchedulerSetting(db, "collection", {
+      enabled: false,
+      cron: "*/15 * * * *",
+      timezone: "Asia/Kolkata",
+    });
+    expect(created.enabled).toBe(false);
+    expect(created.cron).toBe("*/15 * * * *");
+    expect(created.timezone).toBe("Asia/Kolkata");
+    const updated = await upsertSchedulerSetting(db, "collection", {
+      enabled: true,
+      cron: "0 * * * *",
+      timezone: "UTC",
+    });
+    expect(updated.jobKey).toBe(created.jobKey);
+    expect(await findSchedulerSetting(db, "collection")).toMatchObject({
+      enabled: true,
+      cron: "0 * * * *",
+      timezone: "UTC",
+    });
+    await deleteSchedulerSetting(db, "collection");
+    expect(await findSchedulerSetting(db, "collection")).toBeUndefined();
+    // Delete is idempotent.
+    await deleteSchedulerSetting(db, "collection");
+    expect(await findSchedulerSetting(db, "collection")).toBeUndefined();
   });
 });

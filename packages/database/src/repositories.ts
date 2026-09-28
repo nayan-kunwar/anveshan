@@ -18,6 +18,7 @@ import type {
   MagicLinkTokenRow,
   NewChangeRow,
   ProgramRow,
+  SchedulerSettingRow,
   SessionRow,
   SubscriptionRow,
   UserRow,
@@ -31,6 +32,7 @@ import {
   notificationDeliveries,
   programSnapshots,
   programs,
+  schedulerSettings,
   sessions,
   subscriptions,
   users,
@@ -387,7 +389,7 @@ export async function listChanges(
 /** Test helper: wipe all rows (never used in production code paths). */
 export async function truncateAll(db: Db): Promise<void> {
   await db.execute(
-    sql`TRUNCATE notification_deliveries, watches, subscriptions, sessions, magic_link_tokens, users, changes, asset_snapshots, program_snapshots, assets, programs, collection_runs`,
+    sql`TRUNCATE scheduler_settings, notification_deliveries, watches, subscriptions, sessions, magic_link_tokens, users, changes, asset_snapshots, program_snapshots, assets, programs, collection_runs`,
   );
 }
 
@@ -900,4 +902,48 @@ export async function retryDeliveryLater(
       updatedAt: new Date(),
     })
     .where(eq(notificationDeliveries.id, id));
+}
+
+// --- admin-controlled scheduler settings ---
+
+/** Row absent = the environment (COLLECTION_*) drives the job. */
+export async function findSchedulerSetting(
+  db: Db,
+  jobKey: string,
+): Promise<SchedulerSettingRow | undefined> {
+  const rows = await db
+    .select()
+    .from(schedulerSettings)
+    .where(eq(schedulerSettings.jobKey, jobKey))
+    .limit(1);
+  return rows[0];
+}
+
+export interface UpsertSchedulerSettingInput {
+  enabled: boolean;
+  cron: string;
+  timezone: string;
+}
+
+export async function upsertSchedulerSetting(
+  db: Db,
+  jobKey: string,
+  input: UpsertSchedulerSettingInput,
+): Promise<SchedulerSettingRow> {
+  const rows = await db
+    .insert(schedulerSettings)
+    .values({ jobKey, ...input, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: schedulerSettings.jobKey,
+      set: { ...input, updatedAt: new Date() },
+    })
+    .returning();
+  const row = rows[0];
+  if (!row) throw new Error("upsertSchedulerSetting returned no row");
+  return row;
+}
+
+/** Back to environment-driven config. No-op when no row exists. */
+export async function deleteSchedulerSetting(db: Db, jobKey: string): Promise<void> {
+  await db.delete(schedulerSettings).where(eq(schedulerSettings.jobKey, jobKey));
 }

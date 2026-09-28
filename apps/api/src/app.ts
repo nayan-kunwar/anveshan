@@ -118,6 +118,13 @@ export function createApp(deps: AppDeps): express.Express {
       requireAdminKey,
       asyncRoute(admin.getCollection),
     );
+    app.get("/api/v1/admin/scheduler", requireAdminKey, asyncRoute(admin.getScheduler));
+    app.put("/api/v1/admin/scheduler", requireAdminKey, asyncRoute(admin.putScheduler));
+    app.delete(
+      "/api/v1/admin/scheduler",
+      requireAdminKey,
+      asyncRoute(admin.deleteScheduler),
+    );
   }
 
   app.use(notFoundHandler);

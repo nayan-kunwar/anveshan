@@ -6,6 +6,10 @@ import type { Pool } from "pg";
 import { isValidAdminKey } from "../src/admin/auth.js";
 import { createAdminService } from "../src/admin/routes.js";
 import type { AdminRunDto, AdminService } from "../src/admin/routes.js";
+import type {
+  SchedulerController,
+  SchedulerStatusDto,
+} from "../src/collection/controller.js";
 import { createApp } from "../src/app.js";
 import type { ProgramStore } from "../src/services/programs.js";
 import type { CollectionSummary } from "../src/collection/service.js";
@@ -13,6 +17,23 @@ import { createLogger } from "../src/logger.js";
 
 const logger = createLogger({ LOG_LEVEL: "silent" });
 const ADMIN_KEY = "a".repeat(32);
+
+const schedulerStatus: SchedulerStatusDto = {
+  enabled: true,
+  source: "environment",
+  cron: "*/30 * * * *",
+  timezone: "UTC",
+  running: false,
+  lastRun: null,
+};
+
+const stubScheduler: SchedulerController = {
+  boot: async () => schedulerStatus,
+  status: async () => schedulerStatus,
+  apply: async () => schedulerStatus,
+  reset: async () => schedulerStatus,
+  stop: async () => undefined,
+};
 
 const store: ProgramStore = {
   listPrograms: async () => ({ items: [], total: 0 }),
@@ -45,6 +66,9 @@ function stubService(overrides: Partial<AdminService> = {}): AdminService {
     }),
     recent: async () => [runDto],
     find: async (id) => (id === RUN_ID ? runDto : undefined),
+    schedulerStatus: async () => schedulerStatus,
+    schedulerApply: async () => schedulerStatus,
+    schedulerReset: async () => schedulerStatus,
     ...overrides,
   };
 }
@@ -186,6 +210,7 @@ describe("admin trigger single-flight", () => {
       pool: {} as Pool,
       logger,
       db: {} as Database,
+      scheduler: stubScheduler,
       runOnce: () => pending,
     });
 

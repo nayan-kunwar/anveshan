@@ -18,10 +18,14 @@ stop, or change them. Design details live in `notification-design.md`
   persists programs/assets/changes, then enqueues **immediate** outbox
   rows for users watching the changed programs.
 - **On/off:** `COLLECTION_ENABLED` (default `true`; `false` in tests)
+  — env is the **kill switch**; runtime state comes from
+  `scheduler_settings` (see §4)
 - **Safety:** session `pg_try_advisory_lock` for the whole run — a second
   tick fires while a run is active, it skips with a warn. Stale `running`
   rows (>2h) are marked `failed` before a new run starts.
 - Invalid `COLLECTION_CRON` throws at boot (fail fast, no silent drift).
+- **Runtime control:** start/stop/reschedule without a restart via the
+  admin API (`/api/v1/admin/scheduler`, see §4).
 
 ### Digest cron — "someone's digest time arrived"
 
@@ -77,8 +81,9 @@ digest cron never touch SMTP themselves.
 
 | What                     | Variable / setting                                                                  | Default               | Notes                                                      |
 | ------------------------ | ----------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------- |
-| Scheduler on/off         | `COLLECTION_ENABLED`                                                                | `true`                | `false` in tests                                           |
-| Scheduler cadence/time   | `COLLECTION_CRON`, `COLLECTION_TZ`                                                  | `*/30 * * * *`, `UTC` | Validated at boot                                          |
+| Scheduler master switch  | `COLLECTION_ENABLED`                                                                | `true`                | Kill switch: boot off + admin PUT/DELETE rejected (409)    |
+| Scheduler cadence/time   | `COLLECTION_CRON`, `COLLECTION_TZ`                                                  | `*/30 * * * *`, `UTC` | Env default; overridden by `scheduler_settings` when set   |
+| Scheduler runtime state  | `scheduler_settings` row (admin API)                                                | none                  | Row absent = env-driven; see §4                            |
 | Digest + delivery on/off | `NOTIFICATIONS_ENABLED`                                                             | `false`               | Gates **both** jobs; must be `true` in prod                |
 | Digest tick cadence      | `DIGEST_TICK_CRON`                                                                  | `* * * * *`           | Check frequency, not send time                             |
 | Delivery cadence         | (none)                                                                              | 30s                   | Hardcoded; no env var                                      |
@@ -86,31 +91,75 @@ digest cron never touch SMTP themselves.
 
 Env values are read **once at boot** (`loadConfig()` in
 `packages/config/src/index.ts`). Changing any of them requires an API
-restart to take effect.
+restart to take effect — except the collection scheduler, which the
+admin API can reconfigure live (§4).
 
-## 4. Turning jobs on/off and rescheduling today
+## 4. Controlling the collection scheduler (admin API)
 
-**Current state: env vars + restart only.** There is no runtime
-start/stop/reschedule endpoint or UI — a cron cannot be changed without
-restarting the process:
+The scheduler is the one job with runtime control. Same gate as the
+other admin endpoints: header `X-Admin-Key` must match `ADMIN_API_KEY`
+(fail-closed 401 when unset).
 
-- Stop the scheduler: `COLLECTION_ENABLED=false`, restart.
-- Change the scheduler cadence: edit `COLLECTION_CRON`, restart.
-- Stop both mail jobs: `NOTIFICATIONS_ENABLED=false`, restart (rows stay
-  `pending` and drain on their own once it is re-enabled).
+| Endpoint                         | Effect                                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/admin/scheduler`    | Status: `{ enabled, source, cron, timezone, running, lastRun }`                                         |
+| `PUT /api/v1/admin/scheduler`    | Start/stop/reschedule. Body (≥1 field): `{ enabled?, cron?, timezone? }`. Persists **and applies now**. |
+| `DELETE /api/v1/admin/scheduler` | Reset: delete the row, immediately back to `COLLECTION_*` env config.                                   |
+
+Rules:
+
+- **Precedence:** a `scheduler_settings` row overrides the `COLLECTION_*`
+  env values until DELETEd; no row = environment-driven (the default —
+  nothing changes for a fresh deploy).
+- **No restart needed:** PUT stops the live cron task and starts the new
+  one in-process. A 60s reconcile tick also picks up external row edits
+  (second instance, hand SQL), so state converges on its own.
+- **Kill switch:** while `COLLECTION_ENABLED=false`, boot starts nothing
+  and PUT/DELETE return `409 SCHEDULER_DISABLED` (GET still works and
+  reports `enabled: false`).
+- **Validation:** cron must be a valid **5-field** (minute-first)
+  expression — node-cron-style 6-field seconds expressions are rejected
+  with `400 BAD_REQUEST`; timezone must be a real IANA zone.
+- **Persisted:** changes survive restarts (unlike in-memory-only
+  control). Each API instance applies the row via boot + reconcile, so
+  multiple instances converge.
+- `running`/`lastRun` read `collection_runs`, so they reflect manual
+  triggers and other instances too.
+
+```bash
+# Stop the scheduler
+curl -X DELETE -H "X-Admin-Key: $ADMIN_API_KEY" \
+  https://<api-host>/api/v1/admin/scheduler
+
+# Every 5 minutes in IST
+curl -X PUT -H "X-Admin-Key: $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": true, "cron": "*/5 * * * *", "timezone": "Asia/Kolkata"}' \
+  https://<api-host>/api/v1/admin/scheduler
+
+# Back to environment config
+curl -X DELETE -H "X-Admin-Key: $ADMIN_API_KEY" \
+  https://<api-host>/api/v1/admin/scheduler
+```
+
+## 5. Turning the other jobs on/off
+
+The digest cron and delivery worker are still **env + restart only**:
+
+- Stop both mail jobs: `NOTIFICATIONS_ENABLED=false`, restart (queued
+  rows stay `pending` and drain on their own once it is re-enabled).
+- Change the digest tick: edit `DIGEST_TICK_CRON`, restart.
 - Stop everything background while keeping the API up:
   `COLLECTION_ENABLED=false NOTIFICATIONS_ENABLED=false pnpm dev`
   (useful before running DB tests).
+- The scheduler can also still be controlled by env
+  (`COLLECTION_ENABLED=false`, edit `COLLECTION_CRON`, restart) — but
+  prefer the admin API in §4 when the API is running.
 
 On Render: edit the env dashboard → redeploy/restart. Locally: edit
 `.env` → restart `pnpm dev`.
 
-A future runtime-control feature (admin endpoint to start/stop/reschedule
-without a restart) has been requested but is **not implemented** — and
-any such design must account for Render hibernation wiping in-memory
-state.
-
-## 5. Shutdown order
+## 6. Shutdown order
 
 On `SIGINT`/`SIGTERM`, `apps/api/src/index.ts` shuts down in a fixed
 order so workers never use a closed pool (the old race logged
@@ -139,7 +188,7 @@ Notes:
   `pending` rows drain on their own after restart — see
   `daily-digest.md` §5.
 
-## 6. Where the jobs run
+## 7. Where the jobs run
 
 - All three run **only in the API process** (`pnpm dev`, `pnpm start`,
   Render). The web frontend runs none of them.
@@ -149,7 +198,7 @@ Notes:
 - Tests set `COLLECTION_ENABLED=false` and `NOTIFICATIONS_ENABLED=false`
   so no cron fires and no SMTP is attempted.
 
-## 7. Troubleshooting pointers
+## 8. Troubleshooting pointers
 
 | Symptom                                             | Where to look                                                                 |
 | --------------------------------------------------- | ----------------------------------------------------------------------------- |
@@ -158,3 +207,4 @@ Notes:
 | Overlapping / skipped collections                   | `snapshot-algorithm.md` §6 — advisory lock skips concurrent runs by design    |
 | Digest arrived late                                 | `daily-digest.md` §3 — catch-up after outage; content still covers the window |
 | Jobs running during tests                           | `development.md` — test env forces both enable flags `false`                  |
+| Scheduler won't start/stop via admin API            | §4 — missing/invalid `X-Admin-Key` (401) or `COLLECTION_ENABLED=false` (409)  |

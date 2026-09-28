@@ -4,7 +4,7 @@ import type { SendMailFn } from "@anveshan/notifications";
 import { createMailer } from "@anveshan/notifications";
 import { createAdminService } from "./admin/routes.js";
 import { createApp } from "./app.js";
-import { startScheduler } from "./collection/scheduler.js";
+import { createSchedulerController } from "./collection/controller.js";
 import { createLogger } from "./logger.js";
 import { startDeliveryInterval, startDigestCron } from "./notifications/worker.js";
 import { createDrizzleProgramStore } from "./services/store.js";
@@ -45,7 +45,11 @@ async function main(): Promise<void> {
     });
   }
 
-  const collectionTask = startScheduler({ config, pool, logger });
+  // Owns the collection-scheduler task: boots from scheduler_settings
+  // (falling back to COLLECTION_* env), lets admin endpoints start/stop/
+  // reschedule without a restart, and stops cleanly on shutdown.
+  const scheduler = createSchedulerController({ config, pool, db, logger });
+  await scheduler.boot();
 
   // Milestone 2: delivery worker (outbox drain) + daily digest cron.
   // Both no-op when NOTIFICATIONS_ENABLED=false.
@@ -58,7 +62,7 @@ async function main(): Promise<void> {
     db,
     config,
     sendMail,
-    adminService: createAdminService({ config, pool, logger, db }),
+    adminService: createAdminService({ config, pool, logger, db, scheduler }),
   });
   const server = app.listen(config.PORT, () => {
     logger.info({ port: config.PORT }, "anveshan api listening");
@@ -77,7 +81,7 @@ async function main(): Promise<void> {
     forceTimer.unref();
     // 1. Stop new background work, 2. await in-flight work (bounded, parallel).
     await Promise.all([
-      collectionTask?.stop() ?? Promise.resolve(),
+      scheduler.stop(),
       deliveryWorker?.stop() ?? Promise.resolve(),
       digestTask?.stop() ?? Promise.resolve(),
     ]);

@@ -25,6 +25,21 @@ export const adminRecentRunsQuerySchema = z.object({
 
 export type AdminRecentRunsQuery = z.infer<typeof adminRecentRunsQuerySchema>;
 
+// --- Admin scheduler control (POST body semantics; cron/tz validity is
+// checked in the controller so every path shares one validator). ---
+
+export const schedulerBodySchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    cron: z.string().trim().min(1).max(100).optional(),
+    timezone: z.string().trim().min(1).max(64).optional(),
+  })
+  .refine((body) => Object.values(body).some((v) => v !== undefined), {
+    message: "Provide at least one of enabled, cron, timezone",
+  });
+
+export type SchedulerBody = z.infer<typeof schedulerBodySchema>;
+
 export const assetsQuerySchema = z.object({
   scope: z.enum(["ALL", "IN", "OUT"]).default("ALL"),
   page: pageSchema,

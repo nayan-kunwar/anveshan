@@ -5,11 +5,20 @@ import type { Request, Response } from "express";
 import type { Pool } from "pg";
 import type { Logger } from "pino";
 import type { z } from "zod";
+import type {
+  SchedulerApplyInput,
+  SchedulerController,
+  SchedulerStatusDto,
+} from "../collection/controller.js";
 import { runCollection } from "../collection/service.js";
 import type { CollectionSummary } from "../collection/service.js";
 import { AppError } from "../errors.js";
 import { enqueueAfterCollection } from "../notifications/enqueue.js";
-import { adminRecentRunsQuerySchema, programIdParamSchema } from "../validation.js";
+import {
+  adminRecentRunsQuerySchema,
+  programIdParamSchema,
+  schedulerBodySchema,
+} from "../validation.js";
 
 function parseAdminQuery<T extends z.ZodTypeAny>(schema: T, value: unknown): z.infer<T> {
   const parsed = schema.safeParse(value);
@@ -54,6 +63,8 @@ export interface AdminServiceDeps {
   pool: Pool;
   logger: Logger;
   db: Database;
+  /** Owns the live collection-scheduler task (admin start/stop/reschedule). */
+  scheduler: SchedulerController;
   /** Injected in tests; defaults to the real collection + enqueue chain. */
   runOnce?: () => Promise<CollectionSummary>;
 }
@@ -67,6 +78,9 @@ export interface AdminService {
   trigger(): Promise<TriggerResult>;
   recent(limit: number): Promise<AdminRunDto[]>;
   find(id: string): Promise<AdminRunDto | undefined>;
+  schedulerStatus(): Promise<SchedulerStatusDto>;
+  schedulerApply(body: SchedulerApplyInput): Promise<SchedulerStatusDto>;
+  schedulerReset(): Promise<SchedulerStatusDto>;
 }
 
 /**
@@ -124,6 +138,12 @@ export function createAdminService(deps: AdminServiceDeps): AdminService {
       const row = await findRunById(db, id);
       return row ? toAdminRunDto(row) : undefined;
     },
+
+    schedulerStatus: () => deps.scheduler.status(),
+
+    schedulerApply: (body: SchedulerApplyInput) => deps.scheduler.apply(body),
+
+    schedulerReset: () => deps.scheduler.reset(),
   };
 }
 
@@ -131,6 +151,9 @@ export function createAdminRoutes(service: AdminService): {
   triggerCollections: (req: Request, res: Response) => Promise<void>;
   listCollections: (req: Request, res: Response) => Promise<void>;
   getCollection: (req: Request, res: Response) => Promise<void>;
+  getScheduler: (req: Request, res: Response) => Promise<void>;
+  putScheduler: (req: Request, res: Response) => Promise<void>;
+  deleteScheduler: (req: Request, res: Response) => Promise<void>;
 } {
   return {
     triggerCollections: async (_req, res) => {
@@ -149,6 +172,22 @@ export function createAdminRoutes(service: AdminService): {
       const run = await service.find(params.id);
       if (!run) throw new AppError("RUN_NOT_FOUND", "Collection run not found", 404);
       res.json({ data: run });
+    },
+
+    getScheduler: async (_req, res) => {
+      res.json({ data: await service.schedulerStatus() });
+    },
+
+    putScheduler: async (req, res) => {
+      const parsed = schedulerBodySchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        throw AppError.badRequest("Provide at least one of enabled, cron, timezone");
+      }
+      res.json({ data: await service.schedulerApply(parsed.data) });
+    },
+
+    deleteScheduler: async (_req, res) => {
+      res.json({ data: await service.schedulerReset() });
     },
   };
 }
