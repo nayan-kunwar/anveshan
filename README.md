@@ -90,6 +90,7 @@ Web scraping, RSS, webhooks, and other collectors are planned for later mileston
     docs/
       api.md
       architecture.md
+      background-jobs.md
       collector.md
       database.md
       development.md
@@ -264,6 +265,7 @@ See:
 - [`docs/notification-design.md`](docs/notification-design.md)
 - [`docs/notifications.md`](docs/notifications.md)
 - [`docs/daily-digest.md`](docs/daily-digest.md)
+- [`docs/background-jobs.md`](docs/background-jobs.md)
 - `docs/architecture.md`
 - `docs/collector.md`
 - `docs/database.md`

@@ -6,7 +6,8 @@ it is the moment a 24-hour window closes.** Each digest covers
 hours late after an outage — but its content is always that window.
 
 Related: `notification-design.md` (full spec), `notifications.md`
-(who gets mail), `er-diagram.md` (tables).
+(who gets mail), `background-jobs.md` (the three jobs + how to
+configure/stop them), `er-diagram.md` (tables).
 
 ## 1. Your close, in plain terms
 
