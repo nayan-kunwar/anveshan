@@ -11,3 +11,5 @@ coverage/
 pgdata/
 *.log
 .DS_Store
+# Postman local workspace state (committed files live in postman/)
+.postman/

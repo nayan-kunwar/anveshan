@@ -1,0 +1,847 @@
+{
+  "info": {
+    "name": "Anveshan API",
+    "description": "Postman collection for the Anveshan API (docs/openapi.yaml is the source of truth).\n\nRun order: 1. Health -> 2-4 public reads (any order) -> 5 Auth (paste the magic-link token to establish a session) -> 6 Subscription -> 7-8 Admin (set the adminKey environment variable first).\n\nEnvironment variables: baseUrl + adminKey (set in the active environment); programId, runId, userId, magicToken, testEmail, unsubscribeToken (collection variables, chained automatically where possible).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "programId", "value": "" },
+    { "key": "runId", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "magicToken", "value": "" },
+    { "key": "testEmail", "value": "anveshan-test@yopmail.com" },
+    { "key": "unsubscribeToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": "Liveness check. No auth."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('body is {status: ok}', () => { pm.expect(pm.response.json()).to.eql({ status: 'ok' }); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Programs (public)",
+      "item": [
+        {
+          "name": "List programs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs?page=1&pageSize=25",
+            "description": "Paginated program list. Chains the first program's id into the programId collection variable."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('has data + pagination', () => { pm.expect(json).to.have.property('data'); pm.expect(json).to.have.property('pagination'); });",
+                  "if (Array.isArray(json.data) && json.data.length > 0) { pm.collectionVariables.set('programId', json.data[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List programs (search + small page)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs?q=a&pageSize=5",
+            "description": "Free-text filter q, pageSize 5."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get program (chained id)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs/{{programId}}",
+            "description": "Run 'List programs' first (it sets programId). :id is the internal UUID, not the HackerOne handle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('body has data.id', () => { pm.expect(pm.response.json().data).to.have.property('id'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get program - not found",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs/99999999-9999-9999-9999-999999999999",
+            "description": "Valid UUID that does not exist."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('code PROGRAM_NOT_FOUND', () => { pm.expect(pm.response.json().error.code).to.eql('PROGRAM_NOT_FOUND'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject pageSize over max",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs?page=1&pageSize=101",
+            "description": "pageSize max is 100."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('code BAD_REQUEST', () => { pm.expect(pm.response.json().error.code).to.eql('BAD_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Assets (public)",
+      "item": [
+        {
+          "name": "List assets - scope=ALL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs/{{programId}}/assets?scope=ALL&page=1&pageSize=100",
+            "description": "Default scope is ALL (in + out of scope). Needs programId from folder 2."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has data + pagination', () => { pm.expect(pm.response.json()).to.have.property('data'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List assets - scope=IN",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs/{{programId}}/assets?scope=IN",
+            "description": "Bounty-eligible scopes only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List assets - scope=OUT",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs/{{programId}}/assets?scope=OUT",
+            "description": "Out-of-scope / bounty-ineligible entries."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject invalid scope",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs/{{programId}}/assets?scope=MAYBE",
+            "description": "scope must be ALL | IN | OUT."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('code BAD_REQUEST', () => { pm.expect(pm.response.json().error.code).to.eql('BAD_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Changes (public)",
+      "item": [
+        {
+          "name": "List changes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs/{{programId}}/changes?page=1&pageSize=100",
+            "description": "Change history for one program, detected_at DESC."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has data + pagination', () => { pm.expect(pm.response.json()).to.have.property('data'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List changes - since filter",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs/{{programId}}/changes?since=2020-01-01T00:00:00Z",
+            "description": "RFC3339 lower bound on detected_at."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject invalid since",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs/{{programId}}/changes?since=not-a-date",
+            "description": "since must be an RFC3339 datetime."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('code BAD_REQUEST', () => { pm.expect(pm.response.json().error.code).to.eql('BAD_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Auth (magic link + session)",
+      "description": "Manual flow: send 'Request magic link', open the email, paste the token into the magicToken collection variable, then send 'Verify magic link'. Verify sets the session cookie (Postman's cookie jar keeps it for later folders).",
+      "item": [
+        {
+          "name": "Request magic link",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/request-magic-link",
+            "description": "Always 200 (no email oracle) even for unknown emails. 429 possible when the rate limiter trips."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 or 429', () => pm.expect([200, 429]).to.include(pm.response.code));",
+                  "pm.test('body has ok', () => { pm.expect(pm.response.json()).to.have.property('ok'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify magic link",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{magicToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/verify",
+            "description": "Paste the emailed token into the magicToken collection variable first. 200 = session cookie set; chains userId. With an empty/invalid token: 400/401."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200/400/401', () => pm.expect([200, 400, 401]).to.include(pm.response.code));",
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.data && json.data.id) { pm.collectionVariables.set('userId', json.data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Session me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/me",
+            "description": "401 until Verify has run with a real token, then 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 or 401', () => pm.expect([200, 401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout (run last)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{baseUrl}}/api/v1/auth/logout",
+            "description": "Deletes the session and clears the cookie. Run after folder 6."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 or 401', () => pm.expect([200, 401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Subscription (session required)",
+      "description": "All endpoints need the session cookie from folder 5 (Verify with a real token). Without a session they return 401, which the assertions tolerate.",
+      "item": [
+        {
+          "name": "Get my subscription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/subscriptions",
+            "description": "data is null until the user saves one."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 or 401', () => pm.expect([200, 401]).to.include(pm.response.code));",
+                  "pm.test('body has data key', () => { pm.expect(pm.response.json()).to.have.property('data'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save subscription - daily digest",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"frequency\": \"daily\",\n  \"watchNewPrograms\": true,\n  \"watchAllPrograms\": false,\n  \"digestTimezone\": \"Asia/Kolkata\",\n  \"digestTimeLocal\": \"13:30\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/subscriptions",
+            "description": "Saves daily cadence + personal digest close. Also clears any unsubscribe opt-out."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200/400/401', () => pm.expect([200, 400, 401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save subscription - immediate",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"frequency\": \"immediate\",\n  \"watchNewPrograms\": false,\n  \"watchAllPrograms\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/subscriptions",
+            "description": "Immediate cadence, watch every program."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200/400/401', () => pm.expect([200, 400, 401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject bad digest time",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"frequency\": \"daily\",\n  \"watchNewPrograms\": true,\n  \"watchAllPrograms\": false,\n  \"digestTimeLocal\": \"8pm\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/subscriptions",
+            "description": "digestTimeLocal must be 24h HH:MM. 400 when authenticated (no session: 401 first)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400 or 401', () => pm.expect([400, 401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List watches",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/subscriptions/watches",
+            "description": "Programs this user watches."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 or 401', () => pm.expect([200, 401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add watch (chained programId)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"programId\": \"{{programId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/subscriptions/watches",
+            "description": "Uses the programId chained in folder 2. 404 if that id does not exist."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200/400/401/404', () => pm.expect([200, 400, 401, 404]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove watch",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/subscriptions/watches/{{programId}}",
+            "description": "Idempotent: removing an unwatched program still 200s."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200/400/401', () => pm.expect([200, 400, 401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unsubscribe via signed token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"token\": \"{{unsubscribeToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/unsubscribe",
+            "description": "No login needed. With the placeholder token it returns 401 INVALID_TOKEN. To get 200: copy userId+token from an email's unsubscribe link into the collection variables."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200/400/401', () => pm.expect([200, 400, 401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Admin - collection runs (X-Admin-Key)",
+      "description": "Requires the adminKey environment variable (equals the server's ADMIN_API_KEY). The server fails closed with 401 when ADMIN_API_KEY is unset.",
+      "item": [
+        {
+          "name": "List recent runs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Admin-Key", "value": "{{adminKey}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/collections?limit=10",
+            "description": "Newest first. Chains the newest run id into the runId collection variable."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('body has data array', () => pm.expect(Array.isArray(json.data)).to.be.true);",
+                  "if (Array.isArray(json.data) && json.data.length > 0) { pm.collectionVariables.set('runId', json.data[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get run (chained id)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Admin-Key", "value": "{{adminKey}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/collections/{{runId}}",
+            "description": "Run 'List recent runs' first. Fresh databases have no runs (400/404 until chained)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200/400/404', () => pm.expect([200, 400, 404]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get run - not found",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Admin-Key", "value": "{{adminKey}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/collections/99999999-9999-9999-9999-999999999999",
+            "description": "Valid UUID with no matching run."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('code RUN_NOT_FOUND', () => { pm.expect(pm.response.json().error.code).to.eql('RUN_NOT_FOUND'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject missing admin key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/collections?limit=10",
+            "description": "No X-Admin-Key header: always 401 UNAUTHORIZED (no oracle between missing/wrong key)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('code UNAUTHORIZED', () => { pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Trigger a collection run [SIDE EFFECT]",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "X-Admin-Key", "value": "{{adminKey}}" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{baseUrl}}/api/v1/admin/collections",
+            "description": "[SIDE EFFECT] Starts a REAL HackerOne collection (15-20 minutes, API + DB load). 202 when it starts, 200 skipped when one is already in flight. Confirm before sending. Poll 'List recent runs' for status."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 or 202', () => pm.expect([200, 202]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Admin - scheduler control (X-Admin-Key)",
+      "description": "Runtime control of the collection scheduler (docs/background-jobs.md section 4). Requires adminKey. The PUT/DELETE requests change live state; run 'Reset scheduler to env config' afterwards to clean up.",
+      "item": [
+        {
+          "name": "Scheduler status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Admin-Key", "value": "{{adminKey}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/scheduler",
+            "description": "Effective state: source=environment means no scheduler_settings row (env drives it); source=database means a row overrides the env."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('status shape', () => { pm.expect(pm.response.json().data).to.have.keys(['enabled', 'source', 'cron', 'timezone', 'running', 'lastRun']); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reschedule scheduler [SIDE EFFECT]",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-Admin-Key", "value": "{{adminKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": true,\n  \"cron\": \"*/15 * * * *\",\n  \"timezone\": \"UTC\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/admin/scheduler",
+            "description": "[SIDE EFFECT] Persists a scheduler_settings row (source becomes 'database') and applies it immediately - no restart. On prod this survives deploys until DELETEd. Run 'Reset scheduler to env config' afterwards."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('applied from database', () => { pm.expect(pm.response.json().data).to.include({ source: 'database', cron: '*/15 * * * *' }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject 6-field cron",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-Admin-Key", "value": "{{adminKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cron\": \"*/30 * * * * *\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/admin/scheduler",
+            "description": "Only 5-field (minute-first) expressions are accepted; seconds syntax is rejected and nothing is written."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('code BAD_REQUEST', () => { pm.expect(pm.response.json().error.code).to.eql('BAD_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject empty body",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-Admin-Key", "value": "{{adminKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{baseUrl}}/api/v1/admin/scheduler",
+            "description": "At least one of enabled / cron / timezone is required."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('code BAD_REQUEST', () => { pm.expect(pm.response.json().error.code).to.eql('BAD_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset scheduler to env config (cleanup)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-Admin-Key", "value": "{{adminKey}}" }],
+            "url": "{{baseUrl}}/api/v1/admin/scheduler",
+            "description": "Deletes the scheduler_settings row and immediately returns to COLLECTION_* env config (source back to 'environment'). Safe cleanup after the PUT above."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('back to environment', () => { pm.expect(pm.response.json().data.source).to.eql('environment'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject missing admin key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/scheduler",
+            "description": "No X-Admin-Key header: always 401 UNAUTHORIZED."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('code UNAUTHORIZED', () => { pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
