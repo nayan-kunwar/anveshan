@@ -293,6 +293,69 @@
               }
             }
           ]
+        },
+        {
+          "name": "List changes - global feed",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/changes?page=1&pageSize=25",
+            "description": "Newest changes across all programs, with programName."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has data + pagination', () => { pm.expect(pm.response.json()).to.have.property('data'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Global feed - filter by type",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/changes?type=ASSET_ADDED&page=1&pageSize=25",
+            "description": "PROGRAM_ADDED | ASSET_ADDED | ASSET_REMOVED."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('all match type', () => { pm.expect(pm.response.json().data.every((c) => c.type === 'ASSET_ADDED')).to.be.true; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Global feed - since window",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/changes?since=2026-01-01T00:00:00Z&page=1&pageSize=25",
+            "description": "ISO datetime filter, newest first."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has data + pagination', () => { pm.expect(pm.response.json()).to.have.property('data'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

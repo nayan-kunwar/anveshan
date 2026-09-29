@@ -120,6 +120,16 @@ const store: ProgramStore = {
       total: filtered.length,
     };
   },
+  listRecentChanges: async (since, type, page, pageSize) => {
+    const filtered = changes
+      .filter((c) => (!since || c.detectedAt >= since) && (!type || c.type === type))
+      .sort((a, b) => b.detectedAt.getTime() - a.detectedAt.getTime());
+    const items = filtered.slice((page - 1) * pageSize, page * pageSize).map((c) => ({
+      ...c,
+      programName: programs.find((p) => p.id === c.programId)?.name ?? "unknown",
+    }));
+    return { items, total: filtered.length };
+  },
 };
 
 const app = createApp({ store, logger });
@@ -249,6 +259,57 @@ describe("GET /api/v1/programs/:id/changes", () => {
     await request(app)
       .get("/api/v1/programs/99999999-9999-9999-9999-999999999999/changes")
       .expect(404);
+  });
+});
+
+describe("GET /api/v1/changes", () => {
+  it("lists newest first with program names and pagination", async () => {
+    const res = await request(app).get("/api/v1/changes").expect(200);
+    expect(res.body.pagination).toEqual({ page: 1, pageSize: 100, total: 2 });
+    expect(res.body.data).toHaveLength(2);
+    expect(res.body.data[0]).toMatchObject({
+      type: "ASSET_ADDED",
+      programId: PROGRAM_ID,
+      programName: "Acme",
+      assetIdentifier: "example.com",
+    });
+    expect(res.body.data[1].type).toBe("ASSET_REMOVED");
+  });
+
+  it("filters by type", async () => {
+    const res = await request(app).get("/api/v1/changes?type=ASSET_REMOVED").expect(200);
+    expect(res.body.pagination.total).toBe(1);
+    expect(res.body.data[0]).toMatchObject({
+      type: "ASSET_REMOVED",
+      programName: "Acme",
+    });
+  });
+
+  it("returns empty shape for unmatched type", async () => {
+    const res = await request(app).get("/api/v1/changes?type=PROGRAM_ADDED").expect(200);
+    expect(res.body.pagination.total).toBe(0);
+    expect(res.body.data).toEqual([]);
+  });
+
+  it("supports since filtering", async () => {
+    const res = await request(app)
+      .get("/api/v1/changes?since=2026-02-01T12:00:00Z")
+      .expect(200);
+    expect(res.body.pagination.total).toBe(1);
+    expect(res.body.data[0].type).toBe("ASSET_ADDED");
+  });
+
+  it("paginates", async () => {
+    const res = await request(app).get("/api/v1/changes?page=2&pageSize=1").expect(200);
+    expect(res.body.pagination).toEqual({ page: 2, pageSize: 1, total: 2 });
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].type).toBe("ASSET_REMOVED");
+  });
+
+  it("rejects invalid type and since with BAD_REQUEST", async () => {
+    await request(app).get("/api/v1/changes?type=BOGUS").expect(400);
+    const res = await request(app).get("/api/v1/changes?since=not-a-date").expect(400);
+    expect(res.body.error.code).toBe("BAD_REQUEST");
   });
 });
 

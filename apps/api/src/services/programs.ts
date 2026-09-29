@@ -1,4 +1,9 @@
-import type { AssetRow, ChangeRow, ProgramRow } from "@anveshan/database";
+import type {
+  AssetRow,
+  ChangeRow,
+  ChangeWithProgram,
+  ProgramRow,
+} from "@anveshan/database";
 import { AppError } from "../errors.js";
 
 // API shapes (must match docs/openapi.yaml).
@@ -27,6 +32,11 @@ export interface ChangeDto {
   assetIdentifier: string | null;
   collectionRunId: string;
   detectedAt: string;
+}
+
+/** ChangeDto plus the program display name (global feed only). */
+export interface GlobalChangeDto extends ChangeDto {
+  programName: string;
 }
 
 export interface Pagination {
@@ -58,6 +68,12 @@ export interface ProgramStore {
     page: number,
     pageSize: number,
   ): Promise<{ items: ChangeRow[]; total: number }>;
+  listRecentChanges(
+    since: Date | undefined,
+    type: "PROGRAM_ADDED" | "ASSET_ADDED" | "ASSET_REMOVED" | undefined,
+    page: number,
+    pageSize: number,
+  ): Promise<{ items: ChangeWithProgram[]; total: number }>;
 }
 
 export function toProgramDto(row: ProgramRow): ProgramDto {
@@ -85,6 +101,10 @@ export function toChangeDto(row: ChangeRow): ChangeDto {
     collectionRunId: row.collectionRunId,
     detectedAt: row.detectedAt.toISOString(),
   };
+}
+
+export function toGlobalChangeDto(row: ChangeWithProgram): GlobalChangeDto {
+  return { ...toChangeDto(row), programName: row.programName };
 }
 
 export async function getProgramOrThrow(

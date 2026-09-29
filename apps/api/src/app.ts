@@ -40,6 +40,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.get("/api/v1/programs/:id", asyncRoute(programs.getProgram));
   app.get("/api/v1/programs/:id/assets", asyncRoute(programs.listAssets));
   app.get("/api/v1/programs/:id/changes", asyncRoute(programs.listChanges));
+  app.get("/api/v1/changes", asyncRoute(programs.listAllChanges));
 
   if (deps.db && deps.config && deps.sendMail) {
     const authDeps = {

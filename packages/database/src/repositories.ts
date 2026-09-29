@@ -566,6 +566,54 @@ export async function listChanges(
   return { items, total };
 }
 
+export type RecentChangeType = "PROGRAM_ADDED" | "ASSET_ADDED" | "ASSET_REMOVED";
+
+export interface ListRecentChangesParams {
+  since?: Date | undefined;
+  type?: RecentChangeType | undefined;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * Global newest-first feed across programs (powers GET /api/v1/changes).
+ * Joins programs for the display name; ordered by detected_at DESC via the
+ * existing changes_detected_at_idx — no new index required.
+ */
+export async function listRecentChanges(
+  db: Db,
+  params: ListRecentChangesParams,
+): Promise<{ items: ChangeWithProgram[]; total: number }> {
+  const filters = [
+    params.since ? gte(changes.detectedAt, params.since) : undefined,
+    params.type ? eq(changes.type, params.type) : undefined,
+  ].filter((c) => c !== undefined);
+  const where = filters.length > 0 ? and(...filters) : undefined;
+  const select = {
+    id: changes.id,
+    type: changes.type,
+    programId: changes.programId,
+    programName: programs.name,
+    assetId: changes.assetId,
+    assetKey: changes.assetKey,
+    assetIdentifier: changes.assetIdentifier,
+    collectionRunId: changes.collectionRunId,
+    detectedAt: changes.detectedAt,
+  };
+  const items = await db
+    .select(select)
+    .from(changes)
+    .innerJoin(programs, eq(changes.programId, programs.id))
+    .where(where)
+    .orderBy(desc(changes.detectedAt))
+    .limit(params.pageSize)
+    .offset((params.page - 1) * params.pageSize);
+  // FK cascade keeps changes orphan-free, so the join can't skew the total.
+  const totalRows = await db.select({ value: count() }).from(changes).where(where);
+  const total = totalRows[0]?.value ?? 0;
+  return { items, total };
+}
+
 /** Test helper: wipe all rows (never used in production code paths). */
 export async function truncateAll(db: Db): Promise<void> {
   await db.execute(

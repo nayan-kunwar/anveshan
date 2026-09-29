@@ -9,6 +9,7 @@ import ThemeToggle from "./ThemeToggle";
 const LINKS = [
   { href: "/", label: "Home" },
   { href: "/programs", label: "Programs" },
+  { href: "/changes", label: "Changes" },
 ];
 
 export default function PublicNav(): ReactNode {

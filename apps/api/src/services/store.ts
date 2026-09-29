@@ -4,6 +4,7 @@ import {
   listAssets,
   listChanges,
   listPrograms,
+  listRecentChanges,
 } from "@anveshan/database";
 import type { ProgramStore } from "./programs.js";
 
@@ -16,5 +17,7 @@ export function createDrizzleProgramStore(db: Db): ProgramStore {
       listAssets(db, programId, scope, page, pageSize),
     listChanges: (programId, since, page, pageSize) =>
       listChanges(db, programId, since, page, pageSize),
+    listRecentChanges: (since, type, page, pageSize) =>
+      listRecentChanges(db, { since, type, page, pageSize }),
   };
 }

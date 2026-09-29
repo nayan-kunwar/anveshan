@@ -32,6 +32,7 @@ const store: ProgramStore = {
   findProgramById: async () => undefined,
   listAssets: async () => ({ items: [], total: 0 }),
   listChanges: async () => ({ items: [], total: 0 }),
+  listRecentChanges: async () => ({ items: [], total: 0 }),
 };
 
 const TEST_SERIAL_LOCK_KEY = "anveshan_test_serial";

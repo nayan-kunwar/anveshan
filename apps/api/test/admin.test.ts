@@ -40,6 +40,7 @@ const store: ProgramStore = {
   findProgramById: async () => undefined,
   listAssets: async () => ({ items: [], total: 0 }),
   listChanges: async () => ({ items: [], total: 0 }),
+  listRecentChanges: async () => ({ items: [], total: 0 }),
 };
 
 const RUN_ID = "33333333-3333-3333-3333-333333333333";

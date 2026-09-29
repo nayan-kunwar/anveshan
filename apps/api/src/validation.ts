@@ -56,6 +56,15 @@ export const changesQuerySchema = z.object({
 
 export type ChangesQuery = z.infer<typeof changesQuerySchema>;
 
+export const globalChangesQuerySchema = z.object({
+  since: z.string().datetime({ offset: true }).optional(),
+  type: z.enum(["PROGRAM_ADDED", "ASSET_ADDED", "ASSET_REMOVED"]).optional(),
+  page: pageSchema,
+  pageSize: pageSizeSchema(100),
+});
+
+export type GlobalChangesQuery = z.infer<typeof globalChangesQuerySchema>;
+
 // --- Milestone 2: auth ---
 
 export const requestMagicLinkSchema = z.object({

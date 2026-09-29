@@ -130,6 +130,39 @@ paths:
                     $ref: "#/components/schemas/Pagination"
         "404":
           $ref: "#/components/responses/ProgramNotFound"
+  /api/v1/changes:
+    get:
+      summary: List recent changes across all programs (global feed)
+      parameters:
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [PROGRAM_ADDED, ASSET_ADDED, ASSET_REMOVED]
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSizeLarge"
+      responses:
+        "200":
+          description: Global change list (detected_at DESC, with programName)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GlobalChange"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          $ref: "#/components/responses/BadRequest"
   /api/v1/auth/request-magic-link:
     post:
       summary: Send a one-time sign-in link (rate-limited per IP + email)
@@ -692,6 +725,36 @@ components:
         programId:
           type: string
           format: uuid
+        assetId:
+          type: string
+          format: uuid
+          nullable: true
+        assetIdentifier:
+          type: string
+          nullable: true
+        collectionRunId:
+          type: string
+          format: uuid
+        detectedAt:
+          type: string
+          format: date-time
+    GlobalChange:
+      description: Change plus the program display name (global feed only)
+      type: object
+      required: [id, type, programId, programName, detectedAt, collectionRunId]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [PROGRAM_ADDED, ASSET_ADDED, ASSET_REMOVED]
+        programId:
+          type: string
+          format: uuid
+        programName:
+          type: string
+          example: Acme
         assetId:
           type: string
           format: uuid

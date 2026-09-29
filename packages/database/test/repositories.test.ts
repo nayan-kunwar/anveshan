@@ -22,6 +22,7 @@ import {
   findSchedulerSetting,
   insertChange,
   listChanges,
+  listRecentChanges,
   runMigrations,
   setPersistStatementTimeout,
   truncateAll,
@@ -272,5 +273,60 @@ describe("database repositories", () => {
       await setPersistStatementTimeout(tx, 60_000);
       await tx.execute(sql`SELECT 1`);
     });
+  });
+
+  it("lists recent changes globally newest-first with program names", async () => {
+    if (!db) return;
+    const progs = await bulkUpsertPrograms(db, [
+      { platform: "hackerone", externalId: "feed-a", name: "Feed A" },
+      { platform: "hackerone", externalId: "feed-b", name: "Feed B" },
+    ]);
+    const aId = progs.get("hackerone|feed-a")?.id;
+    const bId = progs.get("hackerone|feed-b")?.id;
+    if (!aId || !bId) throw new Error("feed programs missing");
+    const run = await createRun(db);
+    await insertChange(db, {
+      type: "ASSET_ADDED",
+      programId: aId,
+      assetId: null,
+      assetKey: "DOMAIN|x.example.com",
+      assetIdentifier: "x.example.com",
+      collectionRunId: run.id,
+    });
+    await insertChange(db, {
+      type: "PROGRAM_ADDED",
+      programId: bId,
+      assetId: null,
+      assetKey: null,
+      assetIdentifier: null,
+      collectionRunId: run.id,
+    });
+    // Pin distinct timestamps (defaultNow would tie inside one test).
+    await db.execute(
+      sql`UPDATE changes SET detected_at = '2026-01-02T00:00:00Z' WHERE collection_run_id = ${run.id} AND type = 'ASSET_ADDED'`,
+    );
+    await db.execute(
+      sql`UPDATE changes SET detected_at = '2026-01-01T00:00:00Z' WHERE collection_run_id = ${run.id} AND type = 'PROGRAM_ADDED'`,
+    );
+    const mine = (items: { collectionRunId: string }[]) =>
+      items.filter((c) => c.collectionRunId === run.id);
+    const all = await listRecentChanges(db, { page: 1, pageSize: 50 });
+    expect(mine(all.items).map((c) => c.type)).toEqual(["ASSET_ADDED", "PROGRAM_ADDED"]);
+    expect(mine(all.items)[0]?.programName).toBe("Feed A");
+    const typed = await listRecentChanges(db, {
+      type: "PROGRAM_ADDED",
+      page: 1,
+      pageSize: 50,
+    });
+    expect(mine(typed.items)).toHaveLength(1);
+    const since = await listRecentChanges(db, {
+      since: new Date("2026-01-01T12:00:00Z"),
+      page: 1,
+      pageSize: 50,
+    });
+    expect(mine(since.items).map((c) => c.type)).toEqual(["ASSET_ADDED"]);
+    const paged = await listRecentChanges(db, { page: 1, pageSize: 1 });
+    expect(paged.total).toBeGreaterThanOrEqual(2);
+    expect(paged.items).toHaveLength(1);
   });
 });

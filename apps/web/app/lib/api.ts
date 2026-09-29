@@ -212,3 +212,31 @@ export function listChanges(
   if (opts.since) params.set("since", opts.since);
   return api<ChangePage>(`/api/v1/programs/${id}/changes?${params.toString()}`);
 }
+
+export type ChangeTypeFilter = "PROGRAM_ADDED" | "ASSET_ADDED" | "ASSET_REMOVED";
+
+export interface GlobalChange extends Change {
+  programName: string;
+}
+
+interface GlobalChangePage {
+  data: GlobalChange[];
+  pagination: { page: number; pageSize: number; total: number };
+}
+
+export function listAllChanges(
+  opts: {
+    since?: string | undefined;
+    type?: ChangeTypeFilter | undefined;
+    page?: number;
+    pageSize?: number;
+  } = {},
+): Promise<GlobalChangePage> {
+  const params = new URLSearchParams({
+    page: String(opts.page ?? 1),
+    pageSize: String(opts.pageSize ?? 25),
+  });
+  if (opts.since) params.set("since", opts.since);
+  if (opts.type) params.set("type", opts.type);
+  return api<GlobalChangePage>(`/api/v1/changes?${params.toString()}`);
+}

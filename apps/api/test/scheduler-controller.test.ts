@@ -335,6 +335,7 @@ describe("admin scheduler HTTP routes", () => {
     findProgramById: async () => undefined,
     listAssets: async () => ({ items: [], total: 0 }),
     listChanges: async () => ({ items: [], total: 0 }),
+    listRecentChanges: async () => ({ items: [], total: 0 }),
   };
 
   function appWith(configOverrides: Record<string, string>) {

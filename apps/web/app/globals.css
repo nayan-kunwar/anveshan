@@ -15,6 +15,8 @@
   --on-accent: #050b14;
   --good: #34d399;
   --bad: #f87171;
+  --good-soft: rgba(52, 211, 153, 0.12);
+  --bad-soft: rgba(248, 113, 113, 0.12);
   --radius: 12px;
 }
 
@@ -33,6 +35,8 @@
   --on-accent: #ffffff;
   --good: #16a34a;
   --bad: #dc2626;
+  --good-soft: rgba(22, 163, 74, 0.1);
+  --bad-soft: rgba(220, 38, 38, 0.1);
 }
 
 * {
@@ -599,6 +603,16 @@ table.table tr:last-child td {
   border-radius: 999px;
   padding: 0.1rem 0.6rem;
   white-space: nowrap;
+}
+
+.pill-good {
+  color: var(--good);
+  background: var(--good-soft);
+}
+
+.pill-bad {
+  color: var(--bad);
+  background: var(--bad-soft);
 }
 
 /* Landing page. */

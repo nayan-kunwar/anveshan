@@ -6,11 +6,13 @@ import {
   getProgramOrThrow,
   toAssetDto,
   toChangeDto,
+  toGlobalChangeDto,
   toProgramDto,
 } from "../services/programs.js";
 import {
   assetsQuerySchema,
   changesQuerySchema,
+  globalChangesQuerySchema,
   programIdParamSchema,
   programsQuerySchema,
 } from "../validation.js";
@@ -28,6 +30,7 @@ export function createProgramController(store: ProgramStore): {
   getProgram: (req: Request, res: Response) => Promise<void>;
   listAssets: (req: Request, res: Response) => Promise<void>;
   listChanges: (req: Request, res: Response) => Promise<void>;
+  listAllChanges: (req: Request, res: Response) => Promise<void>;
 } {
   return {
     listPrograms: async (req, res) => {
@@ -75,6 +78,21 @@ export function createProgramController(store: ProgramStore): {
       );
       res.json({
         data: items.map(toChangeDto),
+        pagination: { page: query.page, pageSize: query.pageSize, total },
+      });
+    },
+
+    listAllChanges: async (req, res) => {
+      const query = parseQuery(globalChangesQuerySchema, req.query);
+      const since = query.since ? new Date(query.since) : undefined;
+      const { items, total } = await store.listRecentChanges(
+        since,
+        query.type,
+        query.page,
+        query.pageSize,
+      );
+      res.json({
+        data: items.map(toGlobalChangeDto),
         pagination: { page: query.page, pageSize: query.pageSize, total },
       });
     },
