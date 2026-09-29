@@ -5,6 +5,7 @@ import {
   eq,
   gte,
   ilike,
+  inArray,
   isNotNull,
   isNull,
   lt,
@@ -351,6 +352,185 @@ export async function insertAssetSnapshot(
     .insert(assetSnapshots)
     .values({ collectionRunId: runId, programId, assetId, assetKey })
     .onConflictDoNothing();
+}
+
+// --- bulk collection persist ---
+//
+// Same rows and conflict targets as the single-row functions above, but
+// multi-row statements: a full collection costs hundreds of round-trips
+// instead of ~100k. pg caps a statement at 65,535 bind params; 2k rows
+// keeps every bulk statement far below it (assets carry 7 columns).
+
+const BULK_CHUNK_SIZE = 2000;
+
+function chunkRows<T>(rows: T[], size: number = BULK_CHUNK_SIZE): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < rows.length; i += size) out.push(rows.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Bulk upsert programs. Returns rows keyed by
+ * `platform|externalIdLower`. Same SET semantics as upsertProgram
+ * (per-row values via `excluded.*`, one shared timestamp per chunk).
+ */
+export async function bulkUpsertPrograms(
+  db: Db,
+  inputs: UpsertProgramInput[],
+): Promise<Map<string, ProgramRow>> {
+  const byKey = new Map<string, ProgramRow>();
+  if (inputs.length === 0) return byKey;
+  const now = new Date();
+  for (const batch of chunkRows(inputs)) {
+    const rows = await db
+      .insert(programs)
+      .values(
+        batch.map((input) => ({
+          platform: input.platform,
+          externalId: input.externalId,
+          externalIdLower: input.externalId.toLowerCase(),
+          externalNumericId: input.externalNumericId ?? null,
+          name: input.name,
+          url: input.url ?? null,
+          lastSeenAt: now,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [programs.platform, programs.externalIdLower],
+        set: {
+          externalNumericId: sql`excluded."external_numeric_id"`,
+          name: sql`excluded."name"`,
+          url: sql`excluded."url"`,
+          lastSeenAt: now,
+          updatedAt: now,
+        },
+      })
+      .returning();
+    for (const row of rows) {
+      byKey.set(`${row.platform}|${row.externalIdLower}`, row);
+    }
+  }
+  return byKey;
+}
+
+/**
+ * Bulk upsert assets across programs. Returns rows keyed by
+ * `programId|assetKey`. Same target and SET semantics as upsertAsset.
+ */
+export async function bulkUpsertAssets(
+  db: Db,
+  inputs: UpsertAssetInput[],
+): Promise<Map<string, AssetRow>> {
+  const byKey = new Map<string, AssetRow>();
+  if (inputs.length === 0) return byKey;
+  const now = new Date();
+  for (const batch of chunkRows(inputs)) {
+    const rows = await db
+      .insert(assets)
+      .values(
+        batch.map((input) => ({
+          programId: input.programId,
+          externalId: input.externalId ?? null,
+          identifier: input.identifier,
+          normalizedIdentifier: input.normalizedIdentifier,
+          type: input.type,
+          scope: input.scope,
+          assetKey: `${input.type}|${input.normalizedIdentifier}`,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [assets.programId, assets.assetKey],
+        set: {
+          externalId: sql`excluded."external_id"`,
+          identifier: sql`excluded."identifier"`,
+          normalizedIdentifier: sql`excluded."normalized_identifier"`,
+          type: sql`excluded."type"`,
+          scope: sql`excluded."scope"`,
+          updatedAt: now,
+        },
+      })
+      .returning();
+    for (const row of rows) {
+      byKey.set(`${row.programId}|${row.assetKey}`, row);
+    }
+  }
+  return byKey;
+}
+
+/** Bulk insert program snapshot pointers (PK conflict-safe). */
+export async function bulkInsertProgramSnapshots(
+  db: Db,
+  runId: string,
+  programIds: string[],
+): Promise<void> {
+  for (const batch of chunkRows([...new Set(programIds)])) {
+    if (batch.length === 0) continue;
+    await db
+      .insert(programSnapshots)
+      .values(batch.map((programId) => ({ collectionRunId: runId, programId })))
+      .onConflictDoNothing();
+  }
+}
+
+export interface AssetSnapshotInput {
+  programId: string;
+  assetId: string;
+  assetKey: string;
+}
+
+/** Bulk insert asset snapshot pointers (PK conflict-safe). */
+export async function bulkInsertAssetSnapshots(
+  db: Db,
+  runId: string,
+  entries: AssetSnapshotInput[],
+): Promise<void> {
+  for (const batch of chunkRows(entries)) {
+    if (batch.length === 0) continue;
+    await db
+      .insert(assetSnapshots)
+      .values(
+        batch.map((entry) => ({
+          collectionRunId: runId,
+          programId: entry.programId,
+          assetId: entry.assetId,
+          assetKey: entry.assetKey,
+        })),
+      )
+      .onConflictDoNothing();
+  }
+}
+
+export type LiveAssetWithProgram = LiveAsset & { programId: string };
+
+/** Load live assets for many programs in one query (diff-before-upsert input). */
+export async function findLiveAssetsByProgramIds(
+  db: Db,
+  programIds: string[],
+): Promise<LiveAssetWithProgram[]> {
+  if (programIds.length === 0) return [];
+  return db
+    .select({
+      id: assets.id,
+      assetKey: assets.assetKey,
+      scope: assets.scope,
+      identifier: assets.identifier,
+      programId: assets.programId,
+    })
+    .from(assets)
+    .where(inArray(assets.programId, programIds));
+}
+
+/**
+ * Bound the persist transaction: a hung statement fails loudly (caught by
+ * the run's failRun path) instead of orphaning a `running` row. SET LOCAL
+ * only applies inside the enclosing transaction. The value is interpolated
+ * as a literal because SET accepts no bind params; guarded to an integer.
+ */
+export async function setPersistStatementTimeout(db: Db, ms: number): Promise<void> {
+  if (!Number.isSafeInteger(ms) || ms <= 0) {
+    throw new Error("setPersistStatementTimeout requires a positive integer ms");
+  }
+  await db.execute(sql`SET LOCAL statement_timeout = ${sql.raw(String(ms))}`);
 }
 
 // --- changes ---

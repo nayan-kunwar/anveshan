@@ -277,4 +277,54 @@ describe("runCollection (fake HackerOne, real Postgres)", () => {
     const found = acme ? await findProgramById(db, acme.id) : undefined;
     expect(found?.name).toBe("Acme Corporation");
   });
+
+  it("bulk persist handles multi-chunk programs end to end", async () => {
+    if (!pool || !config) return;
+    const before = await totalChanges();
+    // 2,100 assets forces multi-chunk bulk statements (2k rows/chunk).
+    const big = Array.from({ length: 2100 }, (_, i) => asset(`bulk${i}.example.com`));
+    const collector = new FakeCollector(
+      new Map([
+        ["bulkbig", { name: "Bulk Big", assets: big }],
+        ["bulksmall", { name: "Bulk Small", assets: [asset("small.example.com")] }],
+      ]),
+    );
+    const summary = await runCollection({ config, pool, collector, logger });
+    expect(summary.status).toBe("completed");
+    expect(summary.programsSeen).toBe(2);
+    expect(summary.assetsSeen).toBe(2101);
+    // New programs emit PROGRAM_ADDED only (no per-asset events by design).
+    expect(summary.programsAdded).toBe(2);
+    expect(summary.assetsAdded).toBe(0);
+    expect(summary.assetsRemoved).toBe(0);
+    expect(await totalChanges()).toBe(before + 2);
+    if (!summary.runId) throw new Error("bulk run missing id");
+    const snaps = await pool.query(
+      "SELECT COUNT(*)::int AS n FROM asset_snapshots WHERE collection_run_id = $1",
+      [summary.runId],
+    );
+    expect((snaps.rows[0] as { n: number }).n).toBe(2101);
+
+    // Identical re-run through the bulk path stays idempotent.
+    const again = await runCollection({ config, pool, collector, logger });
+    expect(again.status).toBe("completed");
+    expect(again.programsAdded).toBe(0);
+    expect(again.assetsAdded).toBe(0);
+    expect(again.assetsRemoved).toBe(0);
+    expect(await totalChanges()).toBe(before + 2);
+
+    // Asset-level diff through the bulk path: +1 added, +1 removed.
+    collector.setState(
+      new Map([
+        ["bulkbig", { name: "Bulk Big", assets: big }],
+        ["bulksmall", { name: "Bulk Small", assets: [asset("newsmall.example.com")] }],
+      ]),
+    );
+    const changed = await runCollection({ config, pool, collector, logger });
+    expect(changed.status).toBe("completed");
+    expect(changed.programsAdded).toBe(0);
+    expect(changed.assetsAdded).toBe(1);
+    expect(changed.assetsRemoved).toBe(1);
+    expect(await totalChanges()).toBe(before + 2 + 2);
+  });
 });

@@ -3,6 +3,10 @@ import { requireHackerOneCredentials } from "@anveshan/config";
 import type { Db } from "@anveshan/database";
 import {
   advisoryUnlock,
+  bulkInsertAssetSnapshots,
+  bulkInsertProgramSnapshots,
+  bulkUpsertAssets,
+  bulkUpsertPrograms,
   completeRun,
   countCompletedRuns,
   countPrograms,
@@ -11,15 +15,13 @@ import {
   failRun,
   failStaleRunningRuns,
   findAllPrograms,
-  findAssetsByProgram,
-  insertAssetSnapshot,
+  findLiveAssetsByProgramIds,
   insertChange,
-  insertProgramSnapshot,
   markMissingAssetsOut,
+  setPersistStatementTimeout,
   tryAdvisoryLock,
-  upsertAsset,
-  upsertProgram,
 } from "@anveshan/database";
+import type { UpsertAssetInput } from "@anveshan/database";
 import type { Pool } from "pg";
 import type { Logger } from "pino";
 import { CollectorError, HackerOneClient, HackerOneCollector } from "@anveshan/collector";
@@ -58,6 +60,9 @@ interface FetchedProgram {
   program: CollectedProgram;
   assets: Awaited<ReturnType<ProgramCollector["getProgramAssets"]>>;
 }
+
+/** Bound each persist statement: a hang fails loudly instead of orphaning. */
+const PERSIST_STATEMENT_TIMEOUT_MS = 60_000;
 
 /**
  * One collection run. Implements docs/snapshot-algorithm.md §6:
@@ -163,47 +168,63 @@ async function fetchAndPersist(
   const programCount = await countPrograms(sessionDb);
   const isFirst = completedRuns === 0 || programCount === 0;
 
-  // --- persist (seconds; single transaction) ---
+  // --- persist (bulk statements; single transaction preserves atomicity) ---
   const stats = await sessionDb.transaction(async (tx) => {
+    await setPersistStatementTimeout(tx, PERSIST_STATEMENT_TIMEOUT_MS);
+
     const prevPrograms = await findAllPrograms(tx);
     const prevByKey = new Map(
       prevPrograms.map((p) => [`${p.platform}|${p.externalIdLower}`, p.id]),
     );
-
-    let programsAdded = 0;
-    let assetsAdded = 0;
-    let assetsRemoved = 0;
-
-    for (const { program, assets } of incoming) {
-      const key = `${PLATFORM_HACKERONE}|${program.externalId.toLowerCase()}`;
-      const prevProgramId = prevByKey.get(key);
-
-      let prev: PreviousProgramState | null = null;
-      let prevIdByKey = new Map<string, string>();
-      if (prevProgramId) {
-        const live = await findAssetsByProgram(tx, prevProgramId);
-        prevIdByKey = new Map(live.map((a) => [a.assetKey, a.id]));
-        prev = {
-          programId: prevProgramId,
-          inAssets: new Map(
-            live.filter((a) => a.scope === "IN").map((a) => [a.assetKey, a.identifier]),
-          ),
-        };
+    // One preload for every previously-seen program (diff-before-upsert).
+    const prevLive = await findLiveAssetsByProgramIds(tx, [...prevByKey.values()]);
+    const prevInByProgram = new Map<string, Map<string, string>>();
+    const prevIdByProgram = new Map<string, Map<string, string>>();
+    for (const live of prevLive) {
+      let inMap = prevInByProgram.get(live.programId);
+      if (!inMap) {
+        inMap = new Map<string, string>();
+        prevInByProgram.set(live.programId, inMap);
       }
+      if (live.scope === "IN") inMap.set(live.assetKey, live.identifier);
+      let idMap = prevIdByProgram.get(live.programId);
+      if (!idMap) {
+        idMap = new Map<string, string>();
+        prevIdByProgram.set(live.programId, idMap);
+      }
+      idMap.set(live.assetKey, live.id);
+    }
+    runLogger.info(
+      { programs: prevPrograms.length, liveAssets: prevLive.length },
+      "previous state loaded",
+    );
 
-      const row = await upsertProgram(tx, {
+    const programRows = await bulkUpsertPrograms(
+      tx,
+      incoming.map(({ program }) => ({
         platform: PLATFORM_HACKERONE,
         externalId: program.externalId,
         name: program.name,
         url: program.url,
         externalNumericId: program.externalNumericId,
-      });
-      await insertProgramSnapshot(tx, runId, row.id);
+      })),
+    );
+    runLogger.info({ programs: programRows.size }, "programs upserted");
+    await bulkInsertProgramSnapshots(
+      tx,
+      runId,
+      [...programRows.values()].map((row) => row.id),
+    );
 
+    const assetInputs: UpsertAssetInput[] = [];
+    const seenByProgram = new Map<string, string[]>();
+    for (const { program, assets } of incoming) {
+      const key = `${PLATFORM_HACKERONE}|${program.externalId.toLowerCase()}`;
+      const row = programRows.get(key);
+      if (!row) throw new Error(`bulkUpsertPrograms returned no row for ${key}`);
       const seenKeys: string[] = [];
-      const upsertedIds = new Map<string, string>();
       for (const asset of assets) {
-        const live = await upsertAsset(tx, {
+        assetInputs.push({
           programId: row.id,
           externalId: asset.externalId,
           identifier: asset.identifier,
@@ -211,15 +232,45 @@ async function fetchAndPersist(
           type: asset.type,
           scope: asset.scope,
         });
-        const liveKey = assetKey(asset.type, asset.identifier);
-        seenKeys.push(liveKey);
-        upsertedIds.set(liveKey, live.id);
-        await insertAssetSnapshot(tx, runId, row.id, live.id, liveKey);
+        seenKeys.push(assetKey(asset.type, asset.identifier));
       }
+      seenByProgram.set(row.id, seenKeys);
+    }
+    const assetRows = await bulkUpsertAssets(tx, assetInputs);
+    runLogger.info({ assets: assetRows.size }, "assets upserted");
+    await bulkInsertAssetSnapshots(
+      tx,
+      runId,
+      [...assetRows.values()].map((row) => ({
+        programId: row.programId,
+        assetId: row.id,
+        assetKey: row.assetKey,
+      })),
+    );
+    runLogger.info("asset snapshots recorded");
+
+    let programsAdded = 0;
+    let assetsAdded = 0;
+    let assetsRemoved = 0;
+
+    for (const { program, assets } of incoming) {
+      const key = `${PLATFORM_HACKERONE}|${program.externalId.toLowerCase()}`;
+      const row = programRows.get(key);
+      if (!row) throw new Error(`bulkUpsertPrograms returned no row for ${key}`);
       // Reconcile seen programs only: missing keys flip to OUT (never delete).
-      await markMissingAssetsOut(tx, row.id, seenKeys);
+      await markMissingAssetsOut(tx, row.id, seenByProgram.get(row.id) ?? []);
 
       if (!isFirst) {
+        const prevProgramId = prevByKey.get(key);
+        const prev: PreviousProgramState | null = prevProgramId
+          ? {
+              programId: prevProgramId,
+              inAssets: prevInByProgram.get(prevProgramId) ?? new Map<string, string>(),
+            }
+          : null;
+        const prevIdByKey = prevProgramId
+          ? (prevIdByProgram.get(prevProgramId) ?? new Map<string, string>())
+          : new Map<string, string>();
         const diff = diffProgram(prev, program, assets, false);
         if (diff.programAdded) {
           programsAdded += 1;
@@ -237,7 +288,7 @@ async function fetchAndPersist(
           await insertChange(tx, {
             type: "ASSET_ADDED",
             programId: row.id,
-            assetId: upsertedIds.get(added.assetKey) ?? null,
+            assetId: assetRows.get(`${row.id}|${added.assetKey}`)?.id ?? null,
             assetKey: added.assetKey,
             assetIdentifier: added.assetIdentifier,
             collectionRunId: runId,
@@ -256,6 +307,7 @@ async function fetchAndPersist(
         }
       }
     }
+    runLogger.info({ programs: incoming.length }, "programs reconciled");
 
     // Programs missing from the API: no deletes, no asset reconcile.
     await completeRun(tx, runId, {
