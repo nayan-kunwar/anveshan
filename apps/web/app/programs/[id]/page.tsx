@@ -322,12 +322,13 @@ export default function ProgramDetailPage(): ReactNode {
       <div className="card">
         <h2>Changes ({changesTotal})</h2>
         <p className="desc">Newest first.</p>
-        <p>
+        <div role="group" aria-label="Changes time window">
           {(["7d", "24h", "all"] as SincePreset[]).map((preset) => (
             <span key={preset}>
               <button
                 type="button"
-                disabled={preset === since}
+                aria-pressed={preset === since}
+                className={preset === since ? "seg-active" : undefined}
                 onClick={() => {
                   setSince(preset);
                 }}
@@ -340,7 +341,7 @@ export default function ProgramDetailPage(): ReactNode {
               </button>{" "}
             </span>
           ))}
-        </p>
+        </div>
         {changes.length === 0 ? (
           <p className="desc">No changes in this window.</p>
         ) : (
