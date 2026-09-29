@@ -112,6 +112,10 @@ Quick start:
     pnpm db:migrate
     pnpm dev        # API on :3000 (second terminal: pnpm dev:web for :3001)
 
+To exercise the API by hand, import `postman/anveshan-collection.json`
+into Postman (36 requests: health, public reads, auth, admin) with an
+environment providing `baseUrl` + `adminKey`.
+
 ## Production
 
 In production, one process runs everything: Express API + cron scheduler + HackerOne collector. No separate worker needed.
@@ -172,16 +176,17 @@ This starts three containers:
 
 ### Environment variables
 
-| Variable              | Required | Default        | Description                           |
-| --------------------- | -------- | -------------- | ------------------------------------- |
-| `DATABASE_URL`        | Yes      | —              | Postgres connection string            |
-| `HACKERONE_USERNAME`  | Yes      | —              | HackerOne API username                |
-| `HACKERONE_API_TOKEN` | Yes      | —              | HackerOne API token                   |
-| `COLLECTION_CRON`     | No       | `*/30 * * * *` | Collection schedule (cron expression) |
-| `COLLECTION_TZ`       | No       | `UTC`          | Timezone for cron schedule            |
-| `COLLECTION_ENABLED`  | No       | `true`         | Enable/disable scheduler              |
-| `PORT`                | No       | `3000`         | API listen port                       |
-| `LOG_LEVEL`           | No       | `info`         | Pino log level                        |
+| Variable              | Required | Default        | Description                                                                |
+| --------------------- | -------- | -------------- | -------------------------------------------------------------------------- |
+| `DATABASE_URL`        | Yes      | —              | Postgres connection string                                                 |
+| `HACKERONE_USERNAME`  | Yes      | —              | HackerOne API username                                                     |
+| `HACKERONE_API_TOKEN` | Yes      | —              | HackerOne API token                                                        |
+| `COLLECTION_CRON`     | No       | `*/30 * * * *` | Collection schedule (cron expression)                                      |
+| `COLLECTION_TZ`       | No       | `UTC`          | Timezone for cron schedule                                                 |
+| `COLLECTION_ENABLED`  | No       | `true`         | Enable/disable scheduler                                                   |
+| `PORT`                | No       | `3000`         | API listen port                                                            |
+| `LOG_LEVEL`           | No       | `info`         | Pino log level                                                             |
+| `ADMIN_API_KEY`       | No       | —              | Gate for `/api/v1/admin/*` (`X-Admin-Key` header; unset = 401 fail-closed) |
 
 ### Manual collection
 
@@ -202,14 +207,25 @@ To run a one-off collection (same logic as the scheduler):
 
 The default cron `*/30 * * * *` runs every 30 minutes. Each full collection takes ~15-20 minutes (rate-limited by HackerOne API). Overlap is prevented by a Postgres session advisory lock — if a run is still going, the next scheduled run skips.
 
+Runtime control (no restart): `GET/PUT/DELETE /api/v1/admin/scheduler`
+(`X-Admin-Key` required) reads or changes the schedule live. A PUT persists a
+`scheduler_settings` row that **overrides** `COLLECTION_CRON`/`COLLECTION_TZ`
+until DELETEd, which hands control back to the env values. A 60s reconcile
+tick picks up external row edits, and `COLLECTION_ENABLED=false` is the master
+kill switch (PUT/DELETE then return `409 SCHEDULER_DISABLED`). Details in
+[`docs/background-jobs.md`](docs/background-jobs.md) §4.
+
 ### Graceful shutdown
 
-The process handles `SIGINT` and `SIGTERM`:
+The process handles `SIGINT` and `SIGTERM` with an ordered stop (10s
+force-exit safety net so a stuck socket or worker can never hang exit):
 
-1. Stops accepting new HTTP requests
-2. Waits for in-flight requests to complete
-3. Closes the database pool
-4. Exits
+1. Stop background work first, awaiting in-flight work (bounded, parallel):
+   collection scheduler (cron task + reconcile timer), delivery worker,
+   digest cron
+2. Close the HTTP server (in-flight requests drain)
+3. Close the database pool
+4. Exit
 
 ## API
 
@@ -227,6 +243,17 @@ examples in [`docs/api.md`](docs/api.md).
 
 Milestone 2 adds: `POST /api/v1/auth/*` (magic link),
 `GET/PUT /api/v1/subscriptions`, watch CRUD, `POST /api/v1/unsubscribe`.
+
+Admin endpoints need `X-Admin-Key: <ADMIN_API_KEY>` (unset key = 401):
+
+| Endpoint                            | Description                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| `POST /api/v1/admin/collections`    | Trigger one collection run now (`202 running`, `200 skipped`)                    |
+| `GET /api/v1/admin/collections`     | Recent collection runs (newest first)                                            |
+| `GET /api/v1/admin/collections/:id` | One run's summary                                                                |
+| `GET /api/v1/admin/scheduler`       | Scheduler status (`enabled`, `source`, `cron`, `timezone`, `running`, `lastRun`) |
+| `PUT /api/v1/admin/scheduler`       | Start/stop/reschedule now (`{ enabled?, cron?, timezone? }`, persists)           |
+| `DELETE /api/v1/admin/scheduler`    | Reset to `COLLECTION_*` env config                                               |
 
 ## Change Types
 
@@ -276,6 +303,9 @@ See:
 
 ## Project Status
 
-Anveshan is currently in the API Collector MVP stage.
+Done: collector MVP (real HackerOne collection, diff, persist, read-only
+API) and email notifications (magic-link auth, subscriptions with watches,
+outbox-based SMTP delivery, Next.js subscriber app).
 
-The immediate goal is to validate reliable program and scope-change collection before introducing notification infrastructure and additional collector types.
+Current milestone: frontend experience — restyling the subscriber app
+without changing API contracts or notification semantics.
