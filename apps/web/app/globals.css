@@ -182,6 +182,14 @@ a {
   font-weight: 600;
 }
 
+/* Bare links that opt out of the browser-default underline. */
+.plain-link {
+  text-decoration: none;
+}
+.plain-link:hover {
+  text-decoration: underline;
+}
+
 /* Use-case icon tile. */
 .icon-tile {
   display: inline-flex;

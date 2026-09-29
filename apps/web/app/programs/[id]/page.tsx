@@ -180,9 +180,13 @@ export default function ProgramDetailPage(): ReactNode {
         <p>No program exists with this id.</p>
         <p>
           {user ? (
-            <Link href="/dashboard">Back to dashboard</Link>
+            <Link href="/dashboard" className="plain-link">
+              Back to dashboard
+            </Link>
           ) : (
-            <Link href="/programs">Back to programs</Link>
+            <Link href="/programs" className="plain-link">
+              Back to programs
+            </Link>
           )}
         </p>
       </div>
@@ -206,9 +210,13 @@ export default function ProgramDetailPage(): ReactNode {
     <>
       <p>
         {user ? (
-          <Link href="/dashboard">← Back to dashboard</Link>
+          <Link href="/dashboard" className="plain-link">
+            ← Back to dashboard
+          </Link>
         ) : (
-          <Link href="/programs">← Back to programs</Link>
+          <Link href="/programs" className="plain-link">
+            ← Back to programs
+          </Link>
         )}
       </p>
 
@@ -225,7 +233,12 @@ export default function ProgramDetailPage(): ReactNode {
           {program.url ? (
             <>
               {" · "}
-              <a href={program.url} target="_blank" rel="noreferrer">
+              <a
+                href={program.url}
+                target="_blank"
+                rel="noreferrer"
+                className="plain-link"
+              >
                 HackerOne profile
               </a>
             </>
