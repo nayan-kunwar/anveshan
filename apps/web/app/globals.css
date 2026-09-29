@@ -187,7 +187,8 @@ a {
   text-decoration: none;
 }
 .plain-link:hover {
-  text-decoration: underline;
+  text-decoration: none;
+  color: var(--accent-hover);
 }
 
 /* Use-case icon tile. */
