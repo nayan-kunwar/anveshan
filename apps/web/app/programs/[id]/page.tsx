@@ -260,12 +260,13 @@ export default function ProgramDetailPage(): ReactNode {
       <div className="card">
         <h2>Assets ({assetsTotal})</h2>
         <p className="desc">Scope filter — IN is what notifications cover.</p>
-        <p>
+        <div role="group" aria-label="Scope filter">
           {(["IN", "OUT", "ALL"] as Scope[]).map((tab) => (
             <span key={tab}>
               <button
                 type="button"
-                disabled={tab === scope}
+                aria-pressed={tab === scope}
+                className={tab === scope ? "seg-active" : undefined}
                 onClick={() => {
                   setScope(tab);
                 }}
@@ -274,7 +275,7 @@ export default function ProgramDetailPage(): ReactNode {
               </button>{" "}
             </span>
           ))}
-        </p>
+        </div>
         {assets.length === 0 ? (
           <p className="desc">No {scope}-scope assets.</p>
         ) : (

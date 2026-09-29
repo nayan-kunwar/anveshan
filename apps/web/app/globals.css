@@ -361,6 +361,14 @@ button:disabled {
   opacity: 0.6;
 }
 
+/* Segmented filter: active tab glows accent (mirrors .nav-link.active). */
+button.seg-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
 label.row {
   display: flex;
   align-items: center;
