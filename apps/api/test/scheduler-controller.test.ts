@@ -2,17 +2,14 @@ import { loadConfig } from "@anveshan/config";
 import type { AppConfig } from "@anveshan/config";
 import type { Database } from "@anveshan/database";
 import {
-  closePool,
   completeRun,
-  createDb,
-  createPool,
   createRun,
   findSchedulerSetting,
-  runMigrations,
+  setupIntegrationTestDb,
   truncateAll,
   upsertSchedulerSetting,
 } from "@anveshan/database";
-import type { Pool, PoolClient } from "pg";
+import type { Pool } from "pg";
 import request from "supertest";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createAdminService } from "../src/admin/routes.js";
@@ -25,29 +22,18 @@ import type { StopHandle } from "../src/stoppable.js";
 import type { ProgramStore } from "../src/services/programs.js";
 
 let db: Database | null = null;
-let serialClient: PoolClient | null = null;
-let ownPool: Pool | null = null;
+let teardown: (() => Promise<void>) | null = null;
 
-const TEST_SERIAL_LOCK_KEY = "anveshan_test_serial";
 const DB_URL = "postgres://anveshan:anveshan@localhost:5433/anveshan";
 const ADMIN_KEY = "a".repeat(32);
 const logger = createLogger({ LOG_LEVEL: "silent" });
 
 beforeAll(async () => {
-  const databaseUrl = process.env["DATABASE_URL"];
-  if (!databaseUrl) {
-    process.stderr.write("DATABASE_URL not set — skipping scheduler controller tests\n");
-    return;
-  }
   try {
-    ownPool = createPool(databaseUrl);
-    serialClient = await ownPool.connect();
-    await serialClient.query("SELECT pg_advisory_lock(hashtext($1))", [
-      TEST_SERIAL_LOCK_KEY,
-    ]);
-    await runMigrations(databaseUrl);
-    db = createDb(ownPool);
-    await truncateAll(db);
+    const setup = await setupIntegrationTestDb();
+    if (!setup) return;
+    db = setup.db;
+    teardown = setup.teardown;
   } catch (error) {
     process.stderr.write(
       `Postgres unreachable — skipping scheduler controller tests: ${String(error)}\n`,
@@ -55,18 +41,7 @@ beforeAll(async () => {
     db = null;
   }
   return async () => {
-    if (serialClient) {
-      await serialClient.query("SELECT pg_advisory_unlock(hashtext($1))", [
-        TEST_SERIAL_LOCK_KEY,
-      ]);
-      serialClient.release();
-      serialClient = null;
-    }
-    if (ownPool) {
-      await ownPool.end();
-      ownPool = null;
-    }
-    await closePool();
+    await teardown?.();
   };
 }, 60000);
 

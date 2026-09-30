@@ -1,18 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import type { Pool, PoolClient } from "pg";
-import { loadConfig } from "@anveshan/config";
+import type { Pool } from "pg";
 import type { AppConfig } from "@anveshan/config";
 import type { ProgramCollector } from "@anveshan/collector";
 import type { CollectedAsset, CollectedProgram } from "@anveshan/domain";
 import {
-  closePool,
   createDb,
-  createPool,
   findAssetsByProgram,
   findProgramById,
   listChanges,
-  runMigrations,
-  truncateAll,
+  setupIntegrationTestDb,
 } from "@anveshan/database";
 import { runCollection } from "../src/collection/service.js";
 import { createLogger } from "../src/logger.js";
@@ -50,23 +46,15 @@ class FakeCollector implements ProgramCollector {
 
 let pool: Pool | null = null;
 let config: AppConfig | null = null;
-// Same file-level exclusion as packages/database tests (shared Postgres).
-let serialClient: PoolClient | null = null;
+let teardown: (() => Promise<void>) | null = null;
 
 beforeAll(async () => {
-  const databaseUrl = process.env["DATABASE_URL"];
-  if (!databaseUrl) {
-    process.stderr.write("DATABASE_URL not set — skipping collection tests\n");
-    return;
-  }
   try {
-    config = loadConfig({ ...process.env, DATABASE_URL: databaseUrl });
-    pool = createPool(config.DATABASE_URL);
-    serialClient = await pool.connect();
-    await serialClient.query("SELECT pg_advisory_lock(hashtext('anveshan_test_serial'))");
-    await pool.query("SELECT 1");
-    await runMigrations(config.DATABASE_URL);
-    await truncateAll(createDb(pool));
+    const setup = await setupIntegrationTestDb();
+    if (!setup) return;
+    pool = setup.pool;
+    config = setup.config;
+    teardown = setup.teardown;
   } catch (error) {
     process.stderr.write(
       `Postgres unreachable — skipping collection tests: ${String(error)}\n`,
@@ -75,18 +63,7 @@ beforeAll(async () => {
     config = null;
   }
   return async () => {
-    if (serialClient) {
-      await serialClient.query(
-        "SELECT pg_advisory_unlock(hashtext('anveshan_test_serial'))",
-      );
-      serialClient.release();
-      serialClient = null;
-    }
-    if (pool) {
-      await pool.end();
-      pool = null;
-    }
-    await closePool();
+    await teardown?.();
   };
 }, 120000);
 

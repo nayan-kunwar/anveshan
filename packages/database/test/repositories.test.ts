@@ -1,7 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import type { Pool, PoolClient } from "pg";
 import { count, eq, sql } from "drizzle-orm";
-import { loadConfig } from "@anveshan/config";
 import {
   advisoryUnlock,
   assetSnapshots,
@@ -9,11 +7,8 @@ import {
   bulkInsertProgramSnapshots,
   bulkUpsertAssets,
   bulkUpsertPrograms,
-  closePool,
   countCompletedRuns,
   countPrograms,
-  createDb,
-  createPool,
   createRun,
   deleteSchedulerSetting,
   failStaleRunningRuns,
@@ -23,9 +18,8 @@ import {
   insertChange,
   listChanges,
   listRecentChanges,
-  runMigrations,
   setPersistStatementTimeout,
-  truncateAll,
+  setupIntegrationTestDb,
   tryAdvisoryLock,
   upsertAsset,
   upsertProgram,
@@ -34,31 +28,14 @@ import {
 import type { Database, UpsertAssetInput } from "../src/index.js";
 
 let db: Database | null = null;
-// File-level mutual exclusion: DB-backed files share one Postgres, so they
-// must never interleave (truncateAll + advisory-lock assertions). Blocking
-// lock on a dedicated session; released in the beforeAll teardown.
-let serialClient: PoolClient | null = null;
-let ownPool: Pool | null = null;
-
-const TEST_SERIAL_LOCK_KEY = "anveshan_test_serial";
+let teardown: (() => Promise<void>) | null = null;
 
 beforeAll(async () => {
-  const databaseUrl = process.env["DATABASE_URL"];
-  if (!databaseUrl) {
-    process.stderr.write("DATABASE_URL not set — skipping database integration tests\n");
-    return;
-  }
   try {
-    const config = loadConfig({ ...process.env, DATABASE_URL: databaseUrl });
-    ownPool = createPool(config.DATABASE_URL);
-    serialClient = await ownPool.connect();
-    await serialClient.query("SELECT pg_advisory_lock(hashtext($1))", [
-      TEST_SERIAL_LOCK_KEY,
-    ]);
-    await ownPool.query("SELECT 1");
-    await runMigrations(config.DATABASE_URL);
-    db = createDb(ownPool);
-    await truncateAll(db);
+    const setup = await setupIntegrationTestDb();
+    if (!setup) return;
+    db = setup.db;
+    teardown = setup.teardown;
   } catch (error) {
     process.stderr.write(
       `Postgres unreachable — skipping database integration tests: ${String(error)}\n`,
@@ -66,18 +43,7 @@ beforeAll(async () => {
     db = null;
   }
   return async () => {
-    if (serialClient) {
-      await serialClient.query("SELECT pg_advisory_unlock(hashtext($1))", [
-        TEST_SERIAL_LOCK_KEY,
-      ]);
-      serialClient.release();
-      serialClient = null;
-    }
-    if (ownPool) {
-      await ownPool.end();
-      ownPool = null;
-    }
-    await closePool();
+    await teardown?.();
   };
 }, 60000);
 

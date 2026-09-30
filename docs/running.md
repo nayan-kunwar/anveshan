@@ -105,6 +105,11 @@ pnpm test
 - Unit + API tests with fixtures; never hits the network.
 - DB-backed tests need Postgres reachable: export `DATABASE_URL`
   (e.g. `export DATABASE_URL=postgres://anveshan:anveshan@localhost:5433/anveshan`).
+  The suite never touches that database: it auto-provisions a separate
+  `anveshan_test` database on the same server (created if missing,
+  migrated, truncated per file). Real local data is safe.
+  Override with `TEST_DATABASE_URL` to point the suite at an
+  already-provisioned database instead.
 - Test env forces `COLLECTION_ENABLED=false`, `NOTIFICATIONS_ENABLED=false`,
   `AUTH_EMAIL_ENABLED=false` — no cron, no SMTP.
 - Live HackerOne check (opt-in): `H1_LIVE_TEST=1 pnpm test:live` with real

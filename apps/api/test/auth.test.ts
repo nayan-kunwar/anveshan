@@ -1,19 +1,14 @@
 import { createFakeSendMail } from "@anveshan/notifications";
 import type { MailMessage } from "@anveshan/notifications";
 import {
-  closePool,
-  createDb,
-  createPool,
   findUserByEmail,
   insertSession,
-  runMigrations,
-  truncateAll,
+  setupIntegrationTestDb,
 } from "@anveshan/database";
 import type { Database } from "@anveshan/database";
 import { loadConfig } from "@anveshan/config";
 import type { AppConfig } from "@anveshan/config";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { Pool, PoolClient } from "pg";
 import request from "supertest";
 import { createApp } from "../src/app.js";
 import type { ProgramStore } from "../src/services/programs.js";
@@ -21,9 +16,8 @@ import { hashSessionToken, signUnsubscribe } from "../src/auth/tokens.js";
 import { createLogger } from "../src/logger.js";
 
 let db: Database | null = null;
-let serialClient: PoolClient | null = null;
-let ownPool: Pool | null = null;
 let config: AppConfig | null = null;
+let teardown: (() => Promise<void>) | null = null;
 
 const sent: MailMessage[] = [];
 
@@ -35,32 +29,19 @@ const store: ProgramStore = {
   listRecentChanges: async () => ({ items: [], total: 0 }),
 };
 
-const TEST_SERIAL_LOCK_KEY = "anveshan_test_serial";
-
 beforeAll(async () => {
-  const databaseUrl = process.env["DATABASE_URL"];
-  if (!databaseUrl) {
-    process.stderr.write("DATABASE_URL not set — skipping auth tests\n");
-    return;
-  }
   try {
-    config = loadConfig({
-      ...process.env,
-      DATABASE_URL: databaseUrl,
+    const setup = await setupIntegrationTestDb({
       MAGIC_LINK_SECRET: "m".repeat(32),
       SESSION_SECRET: "s".repeat(32),
       UNSUBSCRIBE_SECRET: "u".repeat(32),
       AUTH_EMAIL_ENABLED: "true",
       FRONTEND_URL: "http://localhost:3001",
     });
-    ownPool = createPool(config.DATABASE_URL);
-    serialClient = await ownPool.connect();
-    await serialClient.query("SELECT pg_advisory_lock(hashtext($1))", [
-      TEST_SERIAL_LOCK_KEY,
-    ]);
-    await runMigrations(config.DATABASE_URL);
-    db = createDb(ownPool);
-    await truncateAll(db);
+    if (!setup) return;
+    db = setup.db;
+    config = setup.config;
+    teardown = setup.teardown;
   } catch (error) {
     process.stderr.write(
       `Postgres unreachable — skipping auth tests: ${String(error)}\n`,
@@ -69,18 +50,7 @@ beforeAll(async () => {
     config = null;
   }
   return async () => {
-    if (serialClient) {
-      await serialClient.query("SELECT pg_advisory_unlock(hashtext($1))", [
-        TEST_SERIAL_LOCK_KEY,
-      ]);
-      serialClient.release();
-      serialClient = null;
-    }
-    if (ownPool) {
-      await ownPool.end();
-      ownPool = null;
-    }
-    await closePool();
+    await teardown?.();
   };
 }, 60000);
 
@@ -317,10 +287,10 @@ describe("unsubscribe", () => {
 
   it("unsubscribe works with only UNSUBSCRIBE_SECRET set", async () => {
     if (!db) return;
-    const { db: database } = needDeps();
+    const { db: database, config: cfg } = needDeps();
     const minimalConfig = loadConfig({
       ...process.env,
-      DATABASE_URL: process.env["DATABASE_URL"] as string,
+      DATABASE_URL: cfg.DATABASE_URL,
       UNSUBSCRIBE_SECRET: "u".repeat(32),
     });
     const minimalApp = createApp({

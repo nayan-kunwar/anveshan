@@ -21,17 +21,17 @@
 
 Root `package.json` MUST expose:
 
-| Script                                          | Purpose                                                            |
-| ----------------------------------------------- | ------------------------------------------------------------------ |
-| `pnpm dev`                                      | run `apps/api` in watch mode                                       |
-| `pnpm dev:web`                                  | run `apps/web` (Next.js) in dev mode on :3001                      |
-| `pnpm build`                                    | `tsc -b` all workspaces                                            |
-| `pnpm typecheck`                                | `tsc --noEmit` all workspaces                                      |
-| `pnpm lint` / `pnpm format`                     | eslint / prettier check                                            |
-| `pnpm test`                                     | vitest run (unit + API, fixtures only, `COLLECTION_ENABLED=false`) |
-| `pnpm test:live`                                | live HackerOne check, gated by `H1_LIVE_TEST=1`                    |
-| `pnpm collect`                                  | manual collection (same service as scheduler)                      |
-| `pnpm db:migrate` / `db:generate` / `db:studio` | drizzle-kit                                                        |
+| Script                                          | Purpose                                                                                                                                      |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                                      | run `apps/api` in watch mode                                                                                                                 |
+| `pnpm dev:web`                                  | run `apps/web` (Next.js) in dev mode on :3001                                                                                                |
+| `pnpm build`                                    | `tsc -b` all workspaces                                                                                                                      |
+| `pnpm typecheck`                                | `tsc --noEmit` all workspaces                                                                                                                |
+| `pnpm lint` / `pnpm format`                     | eslint / prettier check                                                                                                                      |
+| `pnpm test`                                     | vitest run (unit + API, fixtures only, `COLLECTION_ENABLED=false`; DB suites run against auto-provisioned `anveshan_test`, never the dev DB) |
+| `pnpm test:live`                                | live HackerOne check, gated by `H1_LIVE_TEST=1`                                                                                              |
+| `pnpm collect`                                  | manual collection (same service as scheduler)                                                                                                |
+| `pnpm db:migrate` / `db:generate` / `db:studio` | drizzle-kit                                                                                                                                  |
 
 `apps/api` and each `packages/*` have their own `package.json`
 with `name: "@anveshan/<pkg>"`, `type: module`, strict TS.
