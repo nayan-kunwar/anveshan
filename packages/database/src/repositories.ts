@@ -117,7 +117,7 @@ export async function listPrograms(
   page: number,
   pageSize: number,
   q?: string,
-  sort: "name" | "newest" = "name",
+  sort: "name" | "newest" = "newest",
 ): Promise<{ items: ProgramRow[]; total: number }> {
   const trimmed = q?.trim();
   const where =

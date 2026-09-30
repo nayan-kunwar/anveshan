@@ -18,7 +18,7 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<CatalogSort>("name");
+  const [sort, setSort] = useState<CatalogSort>("newest");
   const [watchedOnly, setWatchedOnly] = useState(false);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
   const [watchBusy, setWatchBusy] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
     async (next: number, search?: string, sortOrder?: CatalogSort) => {
       setError(null);
       try {
-        const res = await listPrograms(next, PAGE_SIZE, search, sortOrder ?? "name");
+        const res = await listPrograms(next, PAGE_SIZE, search, sortOrder ?? "newest");
         setPrograms(res.data);
         setPage(res.pagination.page);
         setTotal(res.pagination.total);

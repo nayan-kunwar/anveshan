@@ -38,11 +38,11 @@ paths:
             maxLength: 100
         - name: sort
           in: query
-          description: name sorts A-Z (default); newest sorts by first-seen, latest arrivals first.
+          description: newest sorts by first-seen, latest arrivals first (default); name sorts A-Z.
           schema:
             type: string
             enum: [name, newest]
-            default: name
+            default: newest
       responses:
         "200":
           description: Program list

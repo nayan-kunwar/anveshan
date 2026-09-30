@@ -147,11 +147,22 @@ describe("GET /health", () => {
 });
 
 describe("GET /api/v1/programs", () => {
-  it("lists programs with pagination envelope", async () => {
+  it("lists programs with pagination envelope, newest first by default", async () => {
     const res = await request(app).get("/api/v1/programs?page=1&pageSize=1").expect(200);
     expect(res.body.pagination).toEqual({ page: 1, pageSize: 1, total: 2 });
     expect(res.body.data).toHaveLength(1);
-    expect(res.body.data[0]).toMatchObject({ externalId: "acme", platform: "hackerone" });
+    expect(res.body.data[0]).toMatchObject({
+      externalId: "globex",
+      platform: "hackerone",
+    });
+  });
+
+  it("sorts A-Z with explicit sort=name", async () => {
+    const res = await request(app)
+      .get("/api/v1/programs?sort=name&pageSize=2")
+      .expect(200);
+    expect(res.body.data[0].externalId).toBe("acme");
+    expect(res.body.data[1].externalId).toBe("globex");
   });
 
   it("rejects pageSize over 100 with BAD_REQUEST", async () => {
@@ -200,10 +211,10 @@ describe("GET /api/v1/programs", () => {
 
   it("flags recently created programs with isNew", async () => {
     const res = await request(app).get("/api/v1/programs?pageSize=2").expect(200);
-    expect(res.body.data[0].externalId).toBe("acme");
-    expect(res.body.data[0].isNew).toBe(false);
-    expect(res.body.data[1].externalId).toBe("globex");
-    expect(res.body.data[1].isNew).toBe(true);
+    expect(res.body.data[0].externalId).toBe("globex");
+    expect(res.body.data[0].isNew).toBe(true);
+    expect(res.body.data[1].externalId).toBe("acme");
+    expect(res.body.data[1].isNew).toBe(false);
   });
 
   it("rejects invalid sort values with BAD_REQUEST", async () => {

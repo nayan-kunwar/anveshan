@@ -9,7 +9,7 @@ export const programsQuerySchema = z.object({
   page: pageSchema,
   pageSize: pageSizeSchema(25),
   q: z.string().trim().max(100).optional(),
-  sort: z.enum(["name", "newest"]).default("name"),
+  sort: z.enum(["name", "newest"]).default("newest"),
 });
 
 export type ProgramsQuery = z.infer<typeof programsQuerySchema>;

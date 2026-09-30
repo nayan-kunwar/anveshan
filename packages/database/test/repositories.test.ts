@@ -245,7 +245,7 @@ describe("database repositories", () => {
     await db.execute(
       sql`UPDATE programs SET created_at = '2026-06-01T00:00:00Z' WHERE external_id = 'sortcase-new'`,
     );
-    const byName = await listPrograms(db, 1, 50, "sortcase");
+    const byName = await listPrograms(db, 1, 50, "sortcase", "name");
     expect(byName.items.map((p) => p.externalId)).toEqual([
       "sortcase-old",
       "sortcase-new",
@@ -256,6 +256,11 @@ describe("database repositories", () => {
       "sortcase-old",
     ]);
     expect(newest.total).toBe(2);
+    const defaulted = await listPrograms(db, 1, 50, "sortcase");
+    expect(defaulted.items.map((p) => p.externalId)).toEqual([
+      "sortcase-new",
+      "sortcase-old",
+    ]);
   });
 
   it("bulk upserts tolerate duplicate conflict keys (last wins)", async () => {
