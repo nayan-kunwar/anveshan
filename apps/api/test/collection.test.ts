@@ -304,4 +304,30 @@ describe("runCollection (fake HackerOne, real Postgres)", () => {
     expect(changed.assetsRemoved).toBe(1);
     expect(await totalChanges()).toBe(before + 2 + 2);
   });
+
+  it("duplicate scopes in one fetch do not fail the run", async () => {
+    if (!pool || !config) return;
+    const before = await totalChanges();
+    const collector = new FakeCollector(
+      new Map([
+        [
+          "dupeprog",
+          {
+            name: "Dupe Prog",
+            assets: [asset("dup.example.com"), asset("dup.example.com")],
+          },
+        ],
+      ]),
+    );
+    const summary = await runCollection({ config, pool, collector, logger });
+    expect(summary.status).toBe("completed");
+    expect(summary.programsAdded).toBe(1);
+    expect(await totalChanges()).toBe(before + 1);
+    const db = createDb(pool);
+    const progs = await db.query.programs.findMany();
+    const prog = progs.find((p) => p.externalId === "dupeprog");
+    if (!prog) throw new Error("dupe program missing");
+    const live = await findAssetsByProgram(db, prog.id);
+    expect(live.filter((a) => a.assetKey === "DOMAIN|dup.example.com")).toHaveLength(1);
+  });
 });

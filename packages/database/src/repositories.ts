@@ -370,6 +370,20 @@ function chunkRows<T>(rows: T[], size: number = BULK_CHUNK_SIZE): T[][] {
 }
 
 /**
+ * Drop duplicate conflict keys, keeping the LAST occurrence. Postgres
+ * rejects multi-row ON CONFLICT DO UPDATE when two proposed rows hit the
+ * same live row (21000), and real collector data contains such duplicates
+ * (e.g. two raw scopes normalizing to one asset key). Keep-last reproduces
+ * the old sequential per-row semantics exactly.
+ */
+function dedupeByKey<T>(rows: T[], keyOf: (row: T) => string): T[] {
+  const lastIndex = new Map<string, number>();
+  rows.forEach((row, i) => lastIndex.set(keyOf(row), i));
+  const keep = new Set(lastIndex.values());
+  return rows.filter((_, i) => keep.has(i));
+}
+
+/**
  * Bulk upsert programs. Returns rows keyed by
  * `platform|externalIdLower`. Same SET semantics as upsertProgram
  * (per-row values via `excluded.*`, one shared timestamp per chunk).
@@ -379,9 +393,13 @@ export async function bulkUpsertPrograms(
   inputs: UpsertProgramInput[],
 ): Promise<Map<string, ProgramRow>> {
   const byKey = new Map<string, ProgramRow>();
-  if (inputs.length === 0) return byKey;
+  const unique = dedupeByKey(
+    inputs,
+    (input) => `${input.platform}|${input.externalId.toLowerCase()}`,
+  );
+  if (unique.length === 0) return byKey;
   const now = new Date();
-  for (const batch of chunkRows(inputs)) {
+  for (const batch of chunkRows(unique)) {
     const rows = await db
       .insert(programs)
       .values(
@@ -422,9 +440,13 @@ export async function bulkUpsertAssets(
   inputs: UpsertAssetInput[],
 ): Promise<Map<string, AssetRow>> {
   const byKey = new Map<string, AssetRow>();
-  if (inputs.length === 0) return byKey;
+  const unique = dedupeByKey(
+    inputs,
+    (input) => `${input.programId}|${input.type}|${input.normalizedIdentifier}`,
+  );
+  if (unique.length === 0) return byKey;
   const now = new Date();
-  for (const batch of chunkRows(inputs)) {
+  for (const batch of chunkRows(unique)) {
     const rows = await db
       .insert(assets)
       .values(

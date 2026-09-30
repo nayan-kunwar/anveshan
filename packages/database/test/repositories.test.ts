@@ -231,6 +231,38 @@ describe("database repositories", () => {
     );
   });
 
+  it("bulk upserts tolerate duplicate conflict keys (last wins)", async () => {
+    if (!db) return;
+    const programs = await bulkUpsertPrograms(db, [
+      { platform: "hackerone", externalId: "dupe-prog", name: "Dupe Prog" },
+      { platform: "hackerone", externalId: "DUPE-PROG", name: "Dupe Prog Renamed" },
+    ]);
+    expect(programs.size).toBe(1);
+    expect(programs.get("hackerone|dupe-prog")?.name).toBe("Dupe Prog Renamed");
+    const programId = programs.get("hackerone|dupe-prog")?.id;
+    if (!programId) throw new Error("dupe program missing");
+    const rows = await bulkUpsertAssets(db, [
+      {
+        programId,
+        identifier: "d.example.com",
+        normalizedIdentifier: "d.example.com",
+        type: "DOMAIN",
+        scope: "IN",
+      },
+      {
+        programId,
+        identifier: "d.example.com",
+        normalizedIdentifier: "d.example.com",
+        type: "DOMAIN",
+        scope: "OUT",
+      },
+    ]);
+    expect(rows.size).toBe(1);
+    expect(rows.get(`${programId}|DOMAIN|d.example.com`)?.scope).toBe("OUT");
+    const live = await findLiveAssetsByProgramIds(db, [programId]);
+    expect(live.filter((a) => a.assetKey === "DOMAIN|d.example.com")).toHaveLength(1);
+  });
+
   it("setPersistStatementTimeout guards input and applies in-transaction", async () => {
     if (!db) return;
     await expect(setPersistStatementTimeout(db, 0)).rejects.toThrow();
