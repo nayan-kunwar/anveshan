@@ -34,9 +34,10 @@ export interface ChangeDto {
   detectedAt: string;
 }
 
-/** ChangeDto plus the program display name (global feed only). */
+/** ChangeDto plus the program display name and platform (global feed only). */
 export interface GlobalChangeDto extends ChangeDto {
   programName: string;
+  platform: string;
 }
 
 export interface Pagination {
@@ -104,7 +105,7 @@ export function toChangeDto(row: ChangeRow): ChangeDto {
 }
 
 export function toGlobalChangeDto(row: ChangeWithProgram): GlobalChangeDto {
-  return { ...toChangeDto(row), programName: row.programName };
+  return { ...toChangeDto(row), programName: row.programName, platform: row.platform };
 }
 
 export async function getProgramOrThrow(

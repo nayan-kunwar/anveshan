@@ -127,6 +127,7 @@ const store: ProgramStore = {
     const items = filtered.slice((page - 1) * pageSize, page * pageSize).map((c) => ({
       ...c,
       programName: programs.find((p) => p.id === c.programId)?.name ?? "unknown",
+      platform: programs.find((p) => p.id === c.programId)?.platform ?? "hackerone",
     }));
     return { items, total: filtered.length };
   },
@@ -271,6 +272,7 @@ describe("GET /api/v1/changes", () => {
       type: "ASSET_ADDED",
       programId: PROGRAM_ID,
       programName: "Acme",
+      platform: "hackerone",
       assetIdentifier: "example.com",
     });
     expect(res.body.data[1].type).toBe("ASSET_REMOVED");

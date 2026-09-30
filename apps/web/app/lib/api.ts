@@ -217,6 +217,7 @@ export type ChangeTypeFilter = "PROGRAM_ADDED" | "ASSET_ADDED" | "ASSET_REMOVED"
 
 export interface GlobalChange extends Change {
   programName: string;
+  platform: string;
 }
 
 interface GlobalChangePage {

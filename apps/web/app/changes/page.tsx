@@ -146,17 +146,36 @@ export default function ChangesPage(): ReactNode {
         ) : changes.length === 0 ? (
           <p className="desc">No changes in this view.</p>
         ) : (
-          <ul className="clean">
-            {changes.map((c) => (
-              <li key={c.id}>
-                <span className={pillClass(c.type)}>{typeLabel(c.type)}</span>{" "}
-                <Link href={`/programs/${c.programId}`}>{c.programName}</Link>{" "}
-                <span className="small">
-                  {c.assetIdentifier ?? "program"} · {formatDateTime(c.detectedAt)}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Change</th>
+                  <th>Asset</th>
+                  <th>Program</th>
+                  <th>Platform</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {changes.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <span className={pillClass(c.type)}>{typeLabel(c.type)}</span>
+                    </td>
+                    <td className="small">{c.assetIdentifier ?? "—"}</td>
+                    <td>
+                      <Link href={`/programs/${c.programId}`}>{c.programName}</Link>
+                    </td>
+                    <td>
+                      <span className="pill">{c.platform}</span>
+                    </td>
+                    <td className="small">{formatDateTime(c.detectedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         <p className="small">
           Page {page} of {pages}

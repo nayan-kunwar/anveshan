@@ -739,9 +739,9 @@ components:
           type: string
           format: date-time
     GlobalChange:
-      description: Change plus the program display name (global feed only)
+      description: Change plus the program display name and platform (global feed only)
       type: object
-      required: [id, type, programId, programName, detectedAt, collectionRunId]
+      required: [id, type, programId, programName, platform, detectedAt, collectionRunId]
       properties:
         id:
           type: string
@@ -755,6 +755,9 @@ components:
         programName:
           type: string
           example: Acme
+        platform:
+          type: string
+          example: hackerone
         assetId:
           type: string
           format: uuid

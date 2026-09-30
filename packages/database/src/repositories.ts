@@ -594,6 +594,7 @@ export async function listRecentChanges(
     type: changes.type,
     programId: changes.programId,
     programName: programs.name,
+    platform: programs.platform,
     assetId: changes.assetId,
     assetKey: changes.assetKey,
     assetIdentifier: changes.assetIdentifier,
@@ -860,6 +861,7 @@ export interface ChangeWithProgram {
   type: string;
   programId: string;
   programName: string;
+  platform: string;
   assetId: string | null;
   assetKey: string | null;
   assetIdentifier: string | null;
@@ -878,6 +880,7 @@ export async function findChangesByRun(
       type: changes.type,
       programId: changes.programId,
       programName: programs.name,
+      platform: programs.platform,
       assetId: changes.assetId,
       assetKey: changes.assetKey,
       assetIdentifier: changes.assetIdentifier,
@@ -902,6 +905,7 @@ export async function findChangesInWindow(
       type: changes.type,
       programId: changes.programId,
       programName: programs.name,
+      platform: programs.platform,
       assetId: changes.assetId,
       assetKey: changes.assetKey,
       assetIdentifier: changes.assetIdentifier,

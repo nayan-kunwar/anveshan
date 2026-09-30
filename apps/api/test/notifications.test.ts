@@ -192,6 +192,7 @@ describe("filterChanges matrix", () => {
     type: "ASSET_ADDED",
     programId: "p1",
     programName: "P1",
+    platform: "hackerone",
     assetId: null,
     assetKey: "URL|a.com",
     assetIdentifier: "a.com",

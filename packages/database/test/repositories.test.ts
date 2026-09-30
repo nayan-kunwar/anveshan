@@ -308,11 +308,12 @@ describe("database repositories", () => {
     await db.execute(
       sql`UPDATE changes SET detected_at = '2026-01-01T00:00:00Z' WHERE collection_run_id = ${run.id} AND type = 'PROGRAM_ADDED'`,
     );
-    const mine = (items: { collectionRunId: string }[]) =>
+    const mine = <T extends { collectionRunId: string }>(items: T[]): T[] =>
       items.filter((c) => c.collectionRunId === run.id);
     const all = await listRecentChanges(db, { page: 1, pageSize: 50 });
     expect(mine(all.items).map((c) => c.type)).toEqual(["ASSET_ADDED", "PROGRAM_ADDED"]);
     expect(mine(all.items)[0]?.programName).toBe("Feed A");
+    expect(mine(all.items)[0]?.platform).toBe("hackerone");
     const typed = await listRecentChanges(db, {
       type: "PROGRAM_ADDED",
       page: 1,
