@@ -145,6 +145,27 @@
               }
             }
           ]
+        },
+        {
+          "name": "List programs - newest first",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/programs?sort=newest&page=1&pageSize=25",
+            "description": "Latest arrivals first; programs seen within 7 days carry isNew=true."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has data + pagination', () => { pm.expect(pm.response.json()).to.have.property('data'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

@@ -32,6 +32,7 @@ const programs: ProgramRow[] = [
     externalIdLower: "globex",
     name: "Globex",
     url: null,
+    createdAt: new Date(Date.now() - 3_600_000),
   }),
 ];
 
@@ -86,7 +87,7 @@ const changes: ChangeRow[] = [
 ];
 
 const store: ProgramStore = {
-  listPrograms: async (page, pageSize, q) => {
+  listPrograms: async (page, pageSize, q, sort) => {
     const trimmed = q?.trim().toLowerCase();
     const filtered =
       trimmed && trimmed.length > 0
@@ -96,8 +97,12 @@ const store: ProgramStore = {
               p.externalId.toLowerCase().includes(trimmed),
           )
         : programs;
+    const ordered =
+      sort === "newest"
+        ? [...filtered].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        : filtered;
     return {
-      items: filtered.slice((page - 1) * pageSize, page * pageSize),
+      items: ordered.slice((page - 1) * pageSize, page * pageSize),
       total: filtered.length,
     };
   },
@@ -183,6 +188,26 @@ describe("GET /api/v1/programs", () => {
     const res = await request(app)
       .get(`/api/v1/programs?q=${"a".repeat(101)}`)
       .expect(400);
+    expect(res.body.error.code).toBe("BAD_REQUEST");
+  });
+
+  it("sorts newest first with sort=newest", async () => {
+    const res = await request(app).get("/api/v1/programs?sort=newest").expect(200);
+    expect(res.body.pagination.total).toBe(2);
+    expect(res.body.data[0].externalId).toBe("globex");
+    expect(res.body.data[1].externalId).toBe("acme");
+  });
+
+  it("flags recently created programs with isNew", async () => {
+    const res = await request(app).get("/api/v1/programs?pageSize=2").expect(200);
+    expect(res.body.data[0].externalId).toBe("acme");
+    expect(res.body.data[0].isNew).toBe(false);
+    expect(res.body.data[1].externalId).toBe("globex");
+    expect(res.body.data[1].isNew).toBe(true);
+  });
+
+  it("rejects invalid sort values with BAD_REQUEST", async () => {
+    const res = await request(app).get("/api/v1/programs?sort=random").expect(400);
     expect(res.body.error.code).toBe("BAD_REQUEST");
   });
 });

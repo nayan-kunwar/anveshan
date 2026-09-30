@@ -233,14 +233,14 @@ Program/asset/change reads are public and read-only. Auth, subscription,
 and watch endpoints need a session (magic link). Full reference with curl
 examples in [`docs/api.md`](docs/api.md).
 
-| Endpoint                           | Description                                               |
-| ---------------------------------- | --------------------------------------------------------- |
-| `GET /health`                      | Health check                                              |
-| `GET /api/v1/programs`             | List programs                                             |
-| `GET /api/v1/programs/:id`         | Get program by UUID                                       |
-| `GET /api/v1/programs/:id/assets`  | List program assets (filter by scope)                     |
-| `GET /api/v1/programs/:id/changes` | List detected changes                                     |
-| `GET /api/v1/changes`              | Global change feed (`type`/`since` filters, newest first) |
+| Endpoint                           | Description                                                  |
+| ---------------------------------- | ------------------------------------------------------------ |
+| `GET /health`                      | Health check                                                 |
+| `GET /api/v1/programs`             | List programs (`q` search, `sort=name/newest`, `isNew` flag) |
+| `GET /api/v1/programs/:id`         | Get program by UUID                                          |
+| `GET /api/v1/programs/:id/assets`  | List program assets (filter by scope)                        |
+| `GET /api/v1/programs/:id/changes` | List detected changes                                        |
+| `GET /api/v1/changes`              | Global change feed (`type`/`since` filters, newest first)    |
 
 Milestone 2 adds: `POST /api/v1/auth/*` (magic link),
 `GET/PUT /api/v1/subscriptions`, watch CRUD, `POST /api/v1/unsubscribe`.

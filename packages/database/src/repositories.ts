@@ -117,6 +117,7 @@ export async function listPrograms(
   page: number,
   pageSize: number,
   q?: string,
+  sort: "name" | "newest" = "name",
 ): Promise<{ items: ProgramRow[]; total: number }> {
   const trimmed = q?.trim();
   const where =
@@ -132,7 +133,7 @@ export async function listPrograms(
     .select()
     .from(programs)
     .where(where)
-    .orderBy(programs.name)
+    .orderBy(sort === "newest" ? desc(programs.createdAt) : programs.name)
     .limit(pageSize)
     .offset((page - 1) * pageSize);
   return { items, total };

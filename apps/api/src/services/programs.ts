@@ -15,6 +15,7 @@ export interface ProgramDto {
   name: string;
   url?: string;
   updatedAt: string;
+  isNew: boolean;
 }
 
 export interface AssetDto {
@@ -40,6 +41,11 @@ export interface GlobalChangeDto extends ChangeDto {
   platform: string;
 }
 
+export type ProgramSort = "name" | "newest";
+
+/** Programs first seen within this window wear the NEW badge. */
+export const NEW_PROGRAM_DAYS = 7;
+
 export interface Pagination {
   page: number;
   pageSize: number;
@@ -55,6 +61,7 @@ export interface ProgramStore {
     page: number,
     pageSize: number,
     q?: string,
+    sort?: ProgramSort,
   ): Promise<{ items: ProgramRow[]; total: number }>;
   findProgramById(id: string): Promise<ProgramRow | undefined>;
   listAssets(
@@ -77,7 +84,7 @@ export interface ProgramStore {
   ): Promise<{ items: ChangeWithProgram[]; total: number }>;
 }
 
-export function toProgramDto(row: ProgramRow): ProgramDto {
+export function toProgramDto(row: ProgramRow, now: Date = new Date()): ProgramDto {
   return {
     id: row.id,
     platform: row.platform,
@@ -85,6 +92,7 @@ export function toProgramDto(row: ProgramRow): ProgramDto {
     name: row.name,
     ...(row.url ? { url: row.url } : {}),
     updatedAt: row.updatedAt.toISOString(),
+    isNew: now.getTime() - row.createdAt.getTime() < NEW_PROGRAM_DAYS * 86_400_000,
   };
 }
 

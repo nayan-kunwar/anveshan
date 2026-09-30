@@ -17,6 +17,7 @@ import {
   findSchedulerSetting,
   insertChange,
   listChanges,
+  listPrograms,
   listRecentChanges,
   setPersistStatementTimeout,
   setupIntegrationTestDb,
@@ -229,6 +230,32 @@ describe("database repositories", () => {
     expect(reloaded.find((a) => a.assetKey === "DOMAIN|bulk0.example.com")?.scope).toBe(
       "OUT",
     );
+  });
+
+  it("lists programs newest-first with sort=newest", async () => {
+    if (!db) return;
+    await bulkUpsertPrograms(db, [
+      { platform: "hackerone", externalId: "sortcase-old", name: "Aardvark" },
+      { platform: "hackerone", externalId: "sortcase-new", name: "Zebra" },
+    ]);
+    // Pin distinct first-seen timestamps (defaultNow would tie inside one test).
+    await db.execute(
+      sql`UPDATE programs SET created_at = '2026-01-01T00:00:00Z' WHERE external_id = 'sortcase-old'`,
+    );
+    await db.execute(
+      sql`UPDATE programs SET created_at = '2026-06-01T00:00:00Z' WHERE external_id = 'sortcase-new'`,
+    );
+    const byName = await listPrograms(db, 1, 50, "sortcase");
+    expect(byName.items.map((p) => p.externalId)).toEqual([
+      "sortcase-old",
+      "sortcase-new",
+    ]);
+    const newest = await listPrograms(db, 1, 50, "sortcase", "newest");
+    expect(newest.items.map((p) => p.externalId)).toEqual([
+      "sortcase-new",
+      "sortcase-old",
+    ]);
+    expect(newest.total).toBe(2);
   });
 
   it("bulk upserts tolerate duplicate conflict keys (last wins)", async () => {

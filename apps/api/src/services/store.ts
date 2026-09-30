@@ -11,7 +11,7 @@ import type { ProgramStore } from "./programs.js";
 /** Production adapter: ProgramStore backed by Drizzle repositories. */
 export function createDrizzleProgramStore(db: Db): ProgramStore {
   return {
-    listPrograms: (page, pageSize, q) => listPrograms(db, page, pageSize, q),
+    listPrograms: (page, pageSize, q, sort) => listPrograms(db, page, pageSize, q, sort),
     findProgramById: (id) => findProgramById(db, id),
     listAssets: (programId, scope, page, pageSize) =>
       listAssets(db, programId, scope, page, pageSize),

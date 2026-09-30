@@ -36,6 +36,13 @@ paths:
           schema:
             type: string
             maxLength: 100
+        - name: sort
+          in: query
+          description: name sorts A-Z (default); newest sorts by first-seen, latest arrivals first.
+          schema:
+            type: string
+            enum: [name, newest]
+            default: name
       responses:
         "200":
           description: Program list
@@ -676,7 +683,7 @@ components:
   schemas:
     Program:
       type: object
-      required: [id, platform, externalId, name]
+      required: [id, platform, externalId, name, isNew]
       properties:
         id:
           type: string
@@ -696,6 +703,9 @@ components:
         updatedAt:
           type: string
           format: date-time
+        isNew:
+          type: boolean
+          description: True when first seen within the last 7 days.
     Asset:
       type: object
       required: [id, identifier, type, scope]

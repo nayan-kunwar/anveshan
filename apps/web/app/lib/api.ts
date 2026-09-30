@@ -73,6 +73,7 @@ export interface Program {
   name: string;
   url?: string;
   updatedAt: string;
+  isNew: boolean;
 }
 
 export function requestMagicLink(email: string): Promise<{ ok: true }> {
@@ -143,11 +144,12 @@ interface ProgramPage {
   pagination: { page: number; pageSize: number; total: number };
 }
 
-/** Load one catalog page (server-side pagination + search, 25/page default). */
+/** Load one catalog page (server-side pagination + search + sort, 25/page default). */
 export async function listPrograms(
   page: number,
   pageSize = 25,
   q?: string,
+  sort?: "name" | "newest",
 ): Promise<ProgramPage> {
   const params = new URLSearchParams({
     page: String(page),
@@ -155,6 +157,7 @@ export async function listPrograms(
   });
   const trimmed = q?.trim();
   if (trimmed) params.set("q", trimmed);
+  if (sort) params.set("sort", sort);
   return api<ProgramPage>(`/api/v1/programs?${params.toString()}`);
 }
 

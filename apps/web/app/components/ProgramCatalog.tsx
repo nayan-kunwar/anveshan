@@ -10,12 +10,15 @@ import { formatDateTime } from "../lib/datetime";
 
 const PAGE_SIZE = 25;
 
+type CatalogSort = "name" | "newest";
+
 export default function ProgramCatalog({ user }: { user: User | null }): ReactNode {
   const router = useRouter();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<CatalogSort>("name");
   const [watchedOnly, setWatchedOnly] = useState(false);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
   const [watchBusy, setWatchBusy] = useState<string | null>(null);
@@ -31,19 +34,22 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
     }
   }, [user]);
 
-  const loadPage = useCallback(async (next: number, search?: string) => {
-    setError(null);
-    try {
-      const res = await listPrograms(next, PAGE_SIZE, search);
-      setPrograms(res.data);
-      setPage(res.pagination.page);
-      setTotal(res.pagination.total);
-      setLoaded(true);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load programs");
-      setLoaded(true);
-    }
-  }, []);
+  const loadPage = useCallback(
+    async (next: number, search?: string, sortOrder?: CatalogSort) => {
+      setError(null);
+      try {
+        const res = await listPrograms(next, PAGE_SIZE, search, sortOrder ?? "name");
+        setPrograms(res.data);
+        setPage(res.pagination.page);
+        setTotal(res.pagination.total);
+        setLoaded(true);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to load programs");
+        setLoaded(true);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     void loadWatches();
@@ -52,10 +58,10 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
   useEffect(() => {
     const trimmed = query.trim();
     const timer = setTimeout(() => {
-      void loadPage(1, trimmed ? trimmed : undefined);
+      void loadPage(1, trimmed ? trimmed : undefined, sort);
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, loadPage]);
+  }, [query, sort, loadPage]);
 
   async function onToggleWatch(programId: string): Promise<void> {
     if (!user) {
@@ -95,6 +101,20 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
         />
+        <div role="group" aria-label="Sort programs" style={{ marginTop: "0.75rem" }}>
+          {(["name", "newest"] as CatalogSort[]).map((order) => (
+            <span key={order}>
+              <button
+                type="button"
+                aria-pressed={order === sort}
+                className={order === sort ? "seg-active" : undefined}
+                onClick={() => setSort(order)}
+              >
+                {order === "name" ? "Name" : "Newest"}
+              </button>{" "}
+            </span>
+          ))}
+        </div>
         {user ? (
           <p>
             <label className="row">
@@ -138,7 +158,8 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
                 {visible.map((p) => (
                   <tr key={p.id}>
                     <td>
-                      <Link href={`/programs/${p.id}`}>{p.name}</Link>
+                      <Link href={`/programs/${p.id}`}>{p.name}</Link>{" "}
+                      {p.isNew ? <span className="pill pill-bad">NEW</span> : null}
                     </td>
                     <td className="small">{p.externalId}</td>
                     <td>
@@ -169,7 +190,10 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
           {page > 1 ? (
             <>
               {" "}
-              <button type="button" onClick={() => void loadPage(page - 1, activeQuery)}>
+              <button
+                type="button"
+                onClick={() => void loadPage(page - 1, activeQuery, sort)}
+              >
                 Previous
               </button>
             </>
@@ -177,7 +201,10 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
           {page < pages ? (
             <>
               {" "}
-              <button type="button" onClick={() => void loadPage(page + 1, activeQuery)}>
+              <button
+                type="button"
+                onClick={() => void loadPage(page + 1, activeQuery, sort)}
+              >
                 Next
               </button>
             </>
