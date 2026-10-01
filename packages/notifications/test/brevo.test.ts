@@ -65,21 +65,27 @@ describe("createBrevoMailer", () => {
   it("rejects with the Brevo error message on non-2xx", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        jsonResponse(401, { code: "failed_authentication", message: "Bad API key" }),
-      ),
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(401, { code: "failed_authentication", message: "Bad API key" }),
+        ),
     );
 
     const send = createBrevoMailer({ apiKey: "bad" }, "from@example.com");
-    await expect(send(MESSAGE)).rejects.toThrow(/Brevo send failed \(HTTP 401: Bad API key\)/);
+    await expect(send(MESSAGE)).rejects.toThrow(
+      /Brevo send failed \(HTTP 401: Bad API key\)/,
+    );
   });
 
   it("maps AbortSignal timeout to a clear timeout error", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockRejectedValue(
-        Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }),
-      ),
+      vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" }),
+        ),
     );
 
     const send = createBrevoMailer({ apiKey: "k" }, "from@example.com", 10_000);

@@ -3,9 +3,9 @@ import { createMailer } from "../src/mailer.js";
 
 describe("createMailer", () => {
   it("builds a brevo mailer when provider=brevo", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({}), { status: 201 }),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({}), { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
 
     const send = createMailer({
@@ -34,8 +34,8 @@ describe("createMailer", () => {
   });
 
   it("throws when smtp is selected without a host", () => {
-    expect(() =>
-      createMailer({ provider: "smtp", from: "noreply@example.com" }),
-    ).toThrow(/host/);
+    expect(() => createMailer({ provider: "smtp", from: "noreply@example.com" })).toThrow(
+      /host/,
+    );
   });
 });

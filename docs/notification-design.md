@@ -777,7 +777,7 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 7. Session middleware (requireSession; SESSION_SECRET; reject expired)
 8. Subscription + watch routes
 9. Notifications package (SMTP transport, configurable send timeout,
-    renderImmediate + renderDaily, pure)
+   renderImmediate + renderDaily, pure)
 10. Enqueue logic (immediate + daily, load changes once, idempotent)
 11. Catch-up (`catchUpImmediate`, `catchUpDailyDigest`; eligibility now)
 12. Delivery worker (drain mutex, claim CTE, stale recovery decrements
@@ -833,7 +833,7 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 | Enqueue throw is caught; collection summary stays completed                 | Isolation                              |
 | Magic-link SMTP timeout still returns 200                                   | No email oracle                        |
 | Overlapping worker tick while draining → second tick no-ops                 | Drain mutex, no double-send            |
-| Change-mail SMTP uses configurable timeout (default 30s)                     | Hung send cannot hit stale recovery    |
+| Change-mail SMTP uses configurable timeout (default 30s)                    | Hung send cannot hit stale recovery    |
 | User switched to daily; catch-up may insert a digest for the last closes    | Catch-up uses current eligibility      |
 
 ---
@@ -843,8 +843,8 @@ Raw tokens never stored. Only HMAC-SHA256 hashes in database.
 | File                                        | Purpose                                                          |
 | ------------------------------------------- | ---------------------------------------------------------------- |
 | `packages/notifications/src/index.ts`       | Public API                                                       |
-| `packages/notifications/src/smtp.ts`        | nodemailer transport (configurable send timeout)             |
-| `packages/notifications/src/brevo.ts`       | Brevo HTTP transport (fetch + configurable timeout)          |
+| `packages/notifications/src/smtp.ts`        | nodemailer transport (configurable send timeout)                 |
+| `packages/notifications/src/brevo.ts`       | Brevo HTTP transport (fetch + configurable timeout)              |
 | `packages/notifications/src/templates.ts`   | renderImmediate, renderDaily (pure)                              |
 | `packages/notifications/src/digest-time.ts` | per-user close math: lastClose, nextClose (pure, Intl only)      |
 | `apps/api/src/auth/routes.ts`               | request-magic-link, verify, me, logout                           |

@@ -24,11 +24,11 @@ cp .env.example .env
 
 Fill in `.env` (see `.env.example`, the source of truth):
 
-| Variable                                                    | Needed for                       | Notes                                                         |
-| ----------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------- |
-| `DATABASE_URL`                                              | everything                       | Template default points at Docker Postgres (`localhost:5433`) |
-| `HACKERONE_USERNAME` / `HACKERONE_API_TOKEN`                | `pnpm collect`, `pnpm test:live` | Leave blank for API/frontend/tests                            |
-| `MAGIC_LINK_SECRET`, `SESSION_SECRET`, `UNSUBSCRIBE_SECRET` | signing in locally               | Any 32-char strings; fail-closed per endpoint when missing    |
+| Variable                                                                | Needed for                       | Notes                                                         |
+| ----------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------- |
+| `DATABASE_URL`                                                          | everything                       | Template default points at Docker Postgres (`localhost:5433`) |
+| `HACKERONE_USERNAME` / `HACKERONE_API_TOKEN`                            | `pnpm collect`, `pnpm test:live` | Leave blank for API/frontend/tests                            |
+| `MAGIC_LINK_SECRET`, `SESSION_SECRET`, `UNSUBSCRIBE_SECRET`             | signing in locally               | Any 32-char strings; fail-closed per endpoint when missing    |
 | `MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `BREVO_API_KEY` | receiving real emails            | Optional locally (see §6)                                     |
 
 Then start Postgres and migrate:
