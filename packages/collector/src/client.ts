@@ -11,6 +11,13 @@ export interface HackerOneLogger {
 
 const noopLogger: HackerOneLogger = { warn: () => undefined };
 
+/**
+ * HackerOne rejects page[number]*page[size] over 9,999 records
+ * (HTTP 400 "Invalid Parameter"). Scope pagination must switch to
+ * filter[id__gt] cursor mode before requesting an over-cap page.
+ */
+const MAX_PAGE_PARAM_RECORDS = 9999;
+
 export interface HackerOneClientOptions {
   baseUrl: string;
   username: string;
@@ -29,8 +36,9 @@ export interface HackerOneClientOptions {
   pageSize?: number;
   /**
    * Collected-object threshold after which scope pagination switches to
-   * `filter[id__gt]` cursor mode. HackerOne caps page params at 10,000
-   * scopes; default 10000. Tests inject a small value.
+   * `filter[id__gt]` cursor mode. HackerOne rejects page params past 9,999
+   * records, so large programs always end in cursor mode regardless of this
+   * threshold; default 10000. Tests inject a small value.
    */
   cursorThreshold?: number;
   fetchFn?: FetchFn;
@@ -130,6 +138,10 @@ export class HackerOneClient {
     // Phase 1: page[number] loop.
     let page = 1;
     for (;;) {
+      // Never request an over-cap page: page[number]*page[size] > 9,999
+      // is a deterministic HTTP 400. Fall through to cursor mode instead.
+      // (seen.size > 0 guard keeps absurd pageSize configs failing loudly.)
+      if (seen.size > 0 && page * this.pageSize > MAX_PAGE_PARAM_RECORDS) break;
       const url =
         `${this.baseUrl}/${endpoint}?page[size]=${this.pageSize}` +
         `&page[number]=${page}`;

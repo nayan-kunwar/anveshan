@@ -201,7 +201,8 @@ The collector should:
 2. Fetch programs (paginate all pages, `page[size]=100`).
 3. Fetch structured scopes per program handle (paginate all pages).
 4. Handle pagination via `links.next` / `data.length == page[size]`,
-   and `filter[id__gt]` after HackerOne's 10,000-scope page cap.
+   and `filter[id__gt]` after HackerOne's 9,999-record page-param cap
+   (page[number]*page[size] over 9,999 is a deterministic HTTP 400).
 5. Respect rate limits (throttle ~40 req/min scopes, backoff on 429 with `Retry-After`).
 6. Normalize HackerOne responses (asset_type map, canonicalize identifiers, `eligible_for_bounty` -> scope).
 7. Return internal domain objects.

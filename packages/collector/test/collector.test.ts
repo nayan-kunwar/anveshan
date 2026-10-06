@@ -302,6 +302,38 @@ describe("HackerOneClient scopes", () => {
     expect(requested.some((u) => u.includes("id__gt"))).toBe(true);
   });
 
+  it("switches to cursor before HackerOne's 9,999-record page cap", async () => {
+    // A >9,900-scope program: endless full pages would previously request
+    // page[number]=100 (100*100=10000 > 9999) and die with HTTP 400.
+    const requested: string[] = [];
+    const fullPage = {
+      data: Array.from({ length: 100 }, (_, i) => ({
+        id: `${1000 + i}`,
+        attributes: {
+          asset_type: "DOMAIN",
+          asset_identifier: `h${i}.example.com`,
+          eligible_for_bounty: true,
+        },
+      })),
+      links: { next: "https://x/?page=2" },
+    };
+    const fetchFn: FetchFn = async (url) => {
+      const u = urlString(url);
+      requested.push(u);
+      if (u.includes("id__gt")) return jsonResponse({ data: [], links: {} });
+      return jsonResponse(fullPage);
+    };
+    const assets = await clientWith(fetchFn).listScopes("acme");
+    const pageRequested = (n: number): boolean =>
+      requested.some(
+        (u) => u.includes(`page%5Bnumber%5D=${n}`) || u.includes(`page[number]=${n}`),
+      );
+    expect(pageRequested(99)).toBe(true);
+    expect(pageRequested(100)).toBe(false);
+    expect(requested.some((u) => u.includes("id__gt"))).toBe(true);
+    expect(assets).toHaveLength(100);
+  });
+
   it("treats submission-only scopes as OUT", async () => {
     const fetchFn: FetchFn = async () =>
       jsonResponse({

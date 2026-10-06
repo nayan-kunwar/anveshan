@@ -170,14 +170,15 @@ Fetch all pages. Never assume the first response contains all records.
 
 - Programs: `page[size]=100` (HackerOne max), start `page[number]=1`.
   Continue while `links.next` is present OR returned `data.length == page[size]`.
-- Scopes: same page loop **until** 10,000 objects for that program, then
-  switch to cursor pagination. HackerOne documents that page parameters
-  return at most 10,000 structured scopes; beyond that use
-  `filter[id__gt]={last_seen_id}` (results sorted by id ascending).
-  Page-only collection **silently truncates** large programs and later
-  emits false `ASSET_REMOVED` / misses `ASSET_ADDED`. MVP collector MUST
-  implement `filter[id__gt]` after the page cap (or use cursor from the
-  start for scopes).
+- Scopes: same page loop, but NEVER request page[number]*page[size]
+  over 9,999 records (HackerOne answers HTTP 400 "Invalid Parameter"
+  past that offset). Switch to `filter[id__gt]={last_seen_id}` cursor
+  pagination (results sorted by id ascending) before the cap, then
+  continue to the end. Page-only collection past the cap dies instead
+  of truncating — and silent truncation (or a crash loop on a large
+  program) later emits false `ASSET_REMOVED` / misses `ASSET_ADDED`.
+  MVP collector MUST implement `filter[id__gt]` after the page cap
+  (or use cursor from the start for scopes).
 - Preserve order-independence: sort/canonicalize before diff;
   API order is not significant.
 
