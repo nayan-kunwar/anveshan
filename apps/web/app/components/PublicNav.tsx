@@ -12,32 +12,39 @@ const LINKS = [
   { href: "/changes", label: "Changes" },
 ];
 
+function isActive(href: string, pathname: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function PublicNav(): ReactNode {
   const pathname = usePathname();
   return (
-    <div
-      className="topbar public-nav"
-      style={{ maxWidth: 1200, margin: "0 auto", padding: "1rem" }}
-    >
-      <div className="brand">
-        <Link href="/">
-          <RadarLogo size={24} />
-          Anveshan
-        </Link>
-      </div>
-      <div className="topbar-right">
-        {LINKS.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={pathname === link.href ? "nav-link active" : "nav-link"}
-          >
-            {link.label}
+    <header className="public-nav">
+      <div className="public-nav-inner">
+        <div className="brand">
+          <Link href="/">
+            <RadarLogo size={22} />
+            Anveshan
           </Link>
-        ))}
-        <Link href="/login">Sign in</Link>
-        <ThemeToggle />
+        </div>
+        <div className="public-links">
+          {LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={isActive(link.href, pathname) ? "nav-link active" : "nav-link"}
+              aria-current={isActive(link.href, pathname) ? "page" : undefined}
+            >
+              {link.label}
+            </Link>
+          ))}
+          <Link href="/login" className="btn-accent nav-signin">
+            Sign in
+          </Link>
+          <ThemeToggle />
+        </div>
       </div>
-    </div>
+    </header>
   );
 }

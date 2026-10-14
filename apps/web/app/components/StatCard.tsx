@@ -9,10 +9,11 @@ export default function StatCard({
   value: string;
   sub: string;
 }): ReactNode {
+  const numeric = /^\d+$/.test(value);
   return (
     <div className="stat">
       <div className="label">{label}</div>
-      <div className="value">{value}</div>
+      <div className={numeric ? "value" : "value value-text"}>{value}</div>
       <div className="sub">{sub}</div>
     </div>
   );

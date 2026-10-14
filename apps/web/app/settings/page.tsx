@@ -128,7 +128,7 @@ export default function SettingsPage(): ReactNode {
       <div className="center">
         <h1>Settings</h1>
         <p>Loading…</p>
-        {error ? <p className="error">{error}</p> : null}
+        {error ? <p className="error-banner">{error}</p> : null}
       </div>
     );
   }
@@ -137,9 +137,13 @@ export default function SettingsPage(): ReactNode {
     <div className="shell">
       <Sidebar email={user.email} onSignOut={() => void onLogout()} active="settings" />
       <div className="content">
-        <Topbar title="Settings" email={user.email} />
+        <Topbar
+          title="Settings"
+          subtitle="How and when Anveshan emails you."
+          email={user.email}
+        />
 
-        <div className="card">
+        <div className="card card-narrow">
           <h2>Notifications</h2>
           <p className="desc">How often Anveshan emails you about watched changes.</p>
           <label className="field">
@@ -254,7 +258,7 @@ export default function SettingsPage(): ReactNode {
           </p>
         </div>
 
-        {error ? <p className="error">{error}</p> : null}
+        {error ? <p className="error-banner">{error}</p> : null}
       </div>
     </div>
   );

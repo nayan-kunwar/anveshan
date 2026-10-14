@@ -7,7 +7,9 @@ import type { ReactNode } from "react";
 import { ApiError, listAllChanges, logout, me } from "../lib/api";
 import type { ChangeTypeFilter, GlobalChange, User } from "../lib/api";
 import { formatDateTime } from "../lib/datetime";
+import Pager from "../components/Pager";
 import PublicNav from "../components/PublicNav";
+import Segmented from "../components/Segmented";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 
@@ -17,8 +19,8 @@ type TypeTab = "ALL" | ChangeTypeFilter;
 const PAGE_SIZE = 25;
 
 const SINCE_TABS: { value: SincePreset; label: string }[] = [
-  { value: "24h", label: "Last 24h" },
   { value: "7d", label: "Last 7 days" },
+  { value: "24h", label: "Last 24h" },
   { value: "all", label: "All time" },
 ];
 
@@ -110,41 +112,29 @@ export default function ChangesPage(): ReactNode {
       <div className="card">
         <h2>Changes ({total})</h2>
         <p className="desc">Newest detected changes across all programs.</p>
-        <div role="group" aria-label="Time window">
-          {SINCE_TABS.map((tab) => (
-            <span key={tab.value}>
-              <button
-                type="button"
-                aria-pressed={tab.value === since}
-                className={tab.value === since ? "seg-active" : undefined}
-                onClick={() => setSince(tab.value)}
-              >
-                {tab.label}
-              </button>{" "}
-            </span>
-          ))}
-        </div>
-        <div role="group" aria-label="Change type" style={{ marginTop: "0.75rem" }}>
-          {TYPE_TABS.map((tab) => (
-            <span key={tab.value}>
-              <button
-                type="button"
-                aria-pressed={tab.value === typeTab}
-                className={tab.value === typeTab ? "seg-active" : undefined}
-                onClick={() => setTypeTab(tab.value)}
-              >
-                {tab.label}
-              </button>{" "}
-            </span>
-          ))}
+        <div className="filters">
+          <Segmented
+            label="Time window"
+            value={since}
+            options={SINCE_TABS}
+            onChange={setSince}
+          />
+          <Segmented
+            label="Change type"
+            value={typeTab}
+            options={TYPE_TABS}
+            onChange={setTypeTab}
+          />
         </div>
       </div>
 
       <div className="card">
         {!loaded ? (
-          <p className="desc">Loading…</p>
+          <p className="empty">Loading…</p>
+        ) : error && changes.length === 0 ? (
+          <p className="empty">Could not load changes.</p>
         ) : changes.length === 0 ? (
-          <p className="desc">No changes in this view.</p>
+          <p className="empty">No changes in this view.</p>
         ) : (
           <div className="table-wrap">
             <table className="table">
@@ -177,34 +167,18 @@ export default function ChangesPage(): ReactNode {
             </table>
           </div>
         )}
-        <p className="small">
-          Page {page} of {pages}
-          {page > 1 ? (
-            <>
-              {" "}
-              <button
-                type="button"
-                onClick={() => void loadPage(page - 1, since, typeTab)}
-              >
-                Prev
-              </button>
-            </>
-          ) : null}
-          {page < pages ? (
-            <>
-              {" "}
-              <button
-                type="button"
-                onClick={() => void loadPage(page + 1, since, typeTab)}
-              >
-                Next
-              </button>
-            </>
-          ) : null}
-        </p>
+        {changes.length > 0 || !error ? (
+          <Pager
+            page={page}
+            pages={pages}
+            summary={`Page ${page} of ${pages}`}
+            onPrev={() => void loadPage(page - 1, since, typeTab)}
+            onNext={() => void loadPage(page + 1, since, typeTab)}
+          />
+        ) : null}
       </div>
 
-      {error ? <p className="error">{error}</p> : null}
+      {error ? <p className="error-banner">{error}</p> : null}
     </>
   );
 
@@ -212,9 +186,7 @@ export default function ChangesPage(): ReactNode {
     return (
       <>
         <PublicNav />
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.5rem 1rem 2rem" }}>
-          {body}
-        </div>
+        <div className="page-wrap">{body}</div>
       </>
     );
   }
@@ -223,7 +195,11 @@ export default function ChangesPage(): ReactNode {
     <div className="shell">
       <Sidebar email={user.email} onSignOut={() => void onLogout()} active="changes" />
       <div className="content">
-        <Topbar title="Changes" email={user.email} />
+        <Topbar
+          title="Changes"
+          subtitle="Scope changes across the catalog."
+          email={user.email}
+        />
         {body}
       </div>
     </div>

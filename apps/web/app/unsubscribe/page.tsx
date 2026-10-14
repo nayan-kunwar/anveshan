@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import type { ReactNode } from "react";
+import PublicNav from "../components/PublicNav";
 import { ApiError, unsubscribe } from "../lib/api";
 
 function UnsubscribeInner(): ReactNode {
@@ -15,10 +17,15 @@ function UnsubscribeInner(): ReactNode {
 
   if (userIdParam === null || tokenParam === null) {
     return (
-      <div className="center">
-        <h1>Unsubscribe</h1>
-        <p className="error">This unsubscribe link is incomplete.</p>
-      </div>
+      <>
+        <PublicNav />
+        <div className="center">
+          <div className="card">
+            <h1>Unsubscribe</h1>
+            <p className="error-banner">This unsubscribe link is incomplete.</p>
+          </div>
+        </div>
+      </>
     );
   }
   const userId: string = userIdParam;
@@ -39,24 +46,44 @@ function UnsubscribeInner(): ReactNode {
 
   if (done) {
     return (
-      <div className="center">
-        <h1>Unsubscribed</h1>
-        <p>You will no longer receive change notifications. Sign in to re-subscribe.</p>
-      </div>
+      <>
+        <PublicNav />
+        <div className="center">
+          <div className="card">
+            <h1>Unsubscribed</h1>
+            <p className="desc">
+              You will no longer receive change notifications. Sign in to re-subscribe.
+            </p>
+            <Link href="/login" className="card-link">
+              Sign in →
+            </Link>
+          </div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="center">
-      <h1>Unsubscribe</h1>
-      <p>Stop all Anveshan change notification emails for this account?</p>
-      <p>
-        <button type="button" disabled={busy} onClick={() => void onConfirm()}>
-          {busy ? "Working…" : "Yes, unsubscribe me"}
-        </button>
-      </p>
-      {error ? <p className="error">{error}</p> : null}
-    </div>
+    <>
+      <PublicNav />
+      <div className="center">
+        <div className="card">
+          <h1>Unsubscribe</h1>
+          <p className="desc">
+            Stop all Anveshan change notification emails for this account?
+          </p>
+          <button
+            type="button"
+            className="primary"
+            disabled={busy}
+            onClick={() => void onConfirm()}
+          >
+            {busy ? "Working…" : "Yes, unsubscribe me"}
+          </button>
+          {error ? <p className="error-banner">{error}</p> : null}
+        </div>
+      </div>
+    </>
   );
 }
 

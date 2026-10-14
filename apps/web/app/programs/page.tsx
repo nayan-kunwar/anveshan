@@ -38,9 +38,7 @@ export default function ProgramsPage(): ReactNode {
     return (
       <>
         <PublicNav />
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.5rem 1rem 2rem" }}>
-          {body}
-        </div>
+        <div className="page-wrap">{body}</div>
       </>
     );
   }
@@ -49,7 +47,11 @@ export default function ProgramsPage(): ReactNode {
     <div className="shell">
       <Sidebar email={user.email} onSignOut={() => void onLogout()} active="programs" />
       <div className="content">
-        <Topbar title="Programs" email={user.email} />
+        <Topbar
+          title="Programs"
+          subtitle="HackerOne programs Anveshan is tracking."
+          email={user.email}
+        />
         {body}
       </div>
     </div>

@@ -77,7 +77,7 @@ export const USE_CASES: UseCase[] = [
     icon: <BellIcon />,
     title: "Diff the scope",
     desc: "Every collection is diffed: assets added, assets removed, nothing else.",
-    href: "/programs",
+    href: "/changes",
     action: "See changes",
   },
   {

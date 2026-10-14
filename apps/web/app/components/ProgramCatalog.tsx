@@ -7,6 +7,8 @@ import type { ReactNode } from "react";
 import { ApiError, addWatch, listPrograms, listWatches, removeWatch } from "../lib/api";
 import type { Program, User } from "../lib/api";
 import { formatDateTime } from "../lib/datetime";
+import Pager from "./Pager";
+import Segmented from "./Segmented";
 
 const PAGE_SIZE = 25;
 
@@ -95,29 +97,27 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
         <p className="desc">
           Every program in the HackerOne catalog. Search across all programs.
         </p>
-        <input
-          type="text"
-          placeholder="Search name or handle…"
-          value={query}
-          onChange={(event) => setQuery(event.currentTarget.value)}
-        />
-        <div role="group" aria-label="Sort programs" style={{ marginTop: "0.75rem" }}>
-          {(["name", "newest"] as CatalogSort[]).map((order) => (
-            <span key={order}>
-              <button
-                type="button"
-                aria-pressed={order === sort}
-                className={order === sort ? "seg-active" : undefined}
-                onClick={() => setSort(order)}
-              >
-                {order === "name" ? "Name" : "Newest"}
-              </button>{" "}
-            </span>
-          ))}
-        </div>
-        {user ? (
-          <p>
-            <label className="row">
+        <div className="toolbar">
+          <div className="search">
+            <input
+              type="text"
+              placeholder="Search name or handle…"
+              aria-label="Search programs"
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+            />
+          </div>
+          <Segmented
+            label="Sort programs"
+            value={sort}
+            options={[
+              { value: "newest", label: "Newest" },
+              { value: "name", label: "Name" },
+            ]}
+            onChange={setSort}
+          />
+          {user ? (
+            <label className="chip-check">
               <input
                 type="checkbox"
                 checked={watchedOnly}
@@ -125,15 +125,17 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
               />
               Watched only
             </label>
-          </p>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       <div className="card">
         {!loaded ? (
-          <p className="desc">Loading…</p>
+          <p className="empty">Loading…</p>
+        ) : error && programs.length === 0 ? (
+          <p className="empty">Could not load programs.</p>
         ) : visible.length === 0 ? (
-          <p className="desc">
+          <p className="empty">
             {total === 0
               ? query.trim()
                 ? "No programs match your search."
@@ -157,9 +159,9 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
               <tbody>
                 {visible.map((p) => (
                   <tr key={p.id}>
-                    <td>
+                    <td className="cell-strong">
                       <Link href={`/programs/${p.id}`}>{p.name}</Link>{" "}
-                      {p.isNew ? <span className="pill pill-bad">NEW</span> : null}
+                      {p.isNew ? <span className="pill">New</span> : null}
                     </td>
                     <td className="small">{p.externalId}</td>
                     <td>
@@ -172,6 +174,7 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
                       <td>
                         <button
                           type="button"
+                          className={watchedIds.has(p.id) ? "btn-sm btn-on" : "btn-sm"}
                           disabled={watchBusy === p.id}
                           onClick={() => void onToggleWatch(p.id)}
                         >
@@ -185,34 +188,18 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
             </table>
           </div>
         )}
-        <p className="small">
-          Showing {rangeStart}–{rangeEnd} of {total} · Page {page} of {pages}
-          {page > 1 ? (
-            <>
-              {" "}
-              <button
-                type="button"
-                onClick={() => void loadPage(page - 1, activeQuery, sort)}
-              >
-                Previous
-              </button>
-            </>
-          ) : null}
-          {page < pages ? (
-            <>
-              {" "}
-              <button
-                type="button"
-                onClick={() => void loadPage(page + 1, activeQuery, sort)}
-              >
-                Next
-              </button>
-            </>
-          ) : null}
-        </p>
+        {programs.length > 0 || !error ? (
+          <Pager
+            page={page}
+            pages={pages}
+            summary={`Showing ${rangeStart}–${rangeEnd} of ${total}`}
+            onPrev={() => void loadPage(page - 1, activeQuery, sort)}
+            onNext={() => void loadPage(page + 1, activeQuery, sort)}
+          />
+        ) : null}
       </div>
 
-      {error ? <p className="error">{error}</p> : null}
+      {error ? <p className="error-banner">{error}</p> : null}
     </>
   );
 }

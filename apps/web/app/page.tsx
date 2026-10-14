@@ -8,6 +8,21 @@ import { me } from "./lib/api";
 import { USE_CASES } from "./lib/useCases";
 import PublicNav from "./components/PublicNav";
 
+const STEPS = [
+  {
+    title: "Collect",
+    body: "Programs and scopes are pulled from the HackerOne API on a schedule.",
+  },
+  {
+    title: "Diff",
+    body: "Each run is compared with the last snapshot: new programs, assets added, assets removed.",
+  },
+  {
+    title: "Notify",
+    body: "Watch the programs you hunt and get an immediate email or one daily digest.",
+  },
+];
+
 export default function Home(): ReactNode {
   const router = useRouter();
 
@@ -25,7 +40,11 @@ export default function Home(): ReactNode {
     <>
       <PublicNav />
       <div className="hero">
-        <h1>Never miss a scope change</h1>
+        <p className="eyebrow">Bug bounty scope monitoring</p>
+        <h1>
+          Never miss a<br />
+          <span className="accent">scope change</span>
+        </h1>
         <p>
           Anveshan tracks bug-bounty programs and emails you the moment in-scope assets
           change.
@@ -37,25 +56,30 @@ export default function Home(): ReactNode {
           <Link href="/programs">Browse programs</Link>
         </div>
       </div>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 1rem" }}>
+      <div className="page-wrap">
+        <h2 className="section-title">How it works</h2>
+        <ol className="steps">
+          {STEPS.map((step, index) => (
+            <li key={step.title}>
+              <span className="step-num">{index + 1}</span>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+            </li>
+          ))}
+        </ol>
         <h2 className="section-title">Use cases</h2>
-      </div>
-      <div
-        className="features"
-        style={{ maxWidth: 1200, margin: "0 auto", padding: "0 1rem" }}
-      >
-        {USE_CASES.map((useCase) => (
-          <div className="card" key={useCase.title}>
-            <span className="icon-tile">{useCase.icon}</span>
-            <h2>{useCase.title}</h2>
-            <p className="desc">{useCase.desc}</p>
-            <Link href={useCase.href} className="card-link">
-              {useCase.action} →
-            </Link>
-          </div>
-        ))}
-      </div>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 1rem 2rem" }}>
+        <div className="features">
+          {USE_CASES.map((useCase) => (
+            <div className="card feature-card" key={useCase.title}>
+              <span className="icon-tile">{useCase.icon}</span>
+              <h2>{useCase.title}</h2>
+              <p className="desc">{useCase.desc}</p>
+              <Link href={useCase.href} className="card-link">
+                {useCase.action} →
+              </Link>
+            </div>
+          ))}
+        </div>
         <div className="card cta-banner">
           <h2>Stay ahead of scope changes</h2>
           <p className="desc">
@@ -66,6 +90,9 @@ export default function Home(): ReactNode {
           </Link>
         </div>
       </div>
+      <footer className="site-foot">
+        Anveshan · scope monitoring for bug bounty hunters
+      </footer>
     </>
   );
 }

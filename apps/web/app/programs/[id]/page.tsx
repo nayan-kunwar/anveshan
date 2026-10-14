@@ -17,7 +17,9 @@ import {
 } from "../../lib/api";
 import type { Asset, Change, Program, User } from "../../lib/api";
 import { formatDateTime } from "../../lib/datetime";
+import Pager from "../../components/Pager";
 import PublicNav from "../../components/PublicNav";
+import Segmented from "../../components/Segmented";
 import Sidebar from "../../components/Sidebar";
 import StatCard from "../../components/StatCard";
 import Topbar from "../../components/Topbar";
@@ -33,10 +35,17 @@ function sinceIso(preset: SincePreset): string | undefined {
   return new Date(Date.now() - hours * 3_600_000).toISOString();
 }
 
-function changeSign(type: string): string {
-  if (type === "ASSET_ADDED" || type === "PROGRAM_ADDED") return "+";
-  if (type === "ASSET_REMOVED") return "−";
-  return "•";
+function pillClass(type: string): string {
+  if (type === "ASSET_ADDED") return "pill pill-good";
+  if (type === "ASSET_REMOVED") return "pill pill-bad";
+  return "pill";
+}
+
+function typeLabel(type: string): string {
+  if (type === "PROGRAM_ADDED") return "Program added";
+  if (type === "ASSET_ADDED") return "Asset added";
+  if (type === "ASSET_REMOVED") return "Asset removed";
+  return type;
 }
 
 export default function ProgramDetailPage(): ReactNode {
@@ -176,19 +185,19 @@ export default function ProgramDetailPage(): ReactNode {
   if (notFound) {
     return (
       <div className="center">
-        <h1>Program not found</h1>
-        <p>No program exists with this id.</p>
-        <p>
+        <div className="card">
+          <h1>Program not found</h1>
+          <p className="desc">No program exists with this id.</p>
           {user ? (
-            <Link href="/dashboard" className="plain-link">
+            <Link href="/dashboard" className="card-link">
               Back to dashboard
             </Link>
           ) : (
-            <Link href="/programs" className="plain-link">
+            <Link href="/programs" className="card-link">
               Back to programs
             </Link>
           )}
-        </p>
+        </div>
       </div>
     );
   }
@@ -196,9 +205,11 @@ export default function ProgramDetailPage(): ReactNode {
   if (!program) {
     return (
       <div className="center">
-        <h1>Program</h1>
-        <p>Loading…</p>
-        {error ? <p className="error">{error}</p> : null}
+        <div className="card">
+          <h1>Program</h1>
+          <p className="empty">Loading…</p>
+          {error ? <p className="error-banner">{error}</p> : null}
+        </div>
       </div>
     );
   }
@@ -208,17 +219,15 @@ export default function ProgramDetailPage(): ReactNode {
 
   const body = (
     <>
-      <p>
-        {user ? (
-          <Link href="/dashboard" className="plain-link">
-            ← Back to dashboard
-          </Link>
-        ) : (
-          <Link href="/programs" className="plain-link">
-            ← Back to programs
-          </Link>
-        )}
-      </p>
+      {user ? (
+        <Link href="/dashboard" className="back-link">
+          ← Dashboard
+        </Link>
+      ) : (
+        <Link href="/programs" className="back-link">
+          ← Programs
+        </Link>
+      )}
 
       <div className="stats">
         <StatCard label="In-scope assets" value={String(inTotal)} sub="scope IN" />
@@ -227,57 +236,56 @@ export default function ProgramDetailPage(): ReactNode {
       </div>
 
       <div className="card">
-        <h2>{program.name}</h2>
-        <p className="desc">
-          {program.platform} · {program.externalId}
-          {program.url ? (
-            <>
-              {" · "}
-              <a
-                href={program.url}
-                target="_blank"
-                rel="noreferrer"
-                className="plain-link"
-              >
-                HackerOne profile
-              </a>
-            </>
-          ) : null}
-        </p>
-        <p>
-          <button
-            type="button"
-            className="primary"
-            disabled={busy}
-            onClick={() => void onToggleWatch()}
-          >
-            {watched ? "Unwatch" : "Watch"}
-          </button>{" "}
-          {watched ? <span className="good">Watched.</span> : null}
-        </p>
+        <div className="card-head">
+          <div>
+            <h2>{program.name}</h2>
+            <p className="desc">
+              {program.platform} · {program.externalId}
+              {program.url ? (
+                <>
+                  {" · "}
+                  <a href={program.url} target="_blank" rel="noreferrer">
+                    HackerOne profile
+                  </a>
+                </>
+              ) : null}
+            </p>
+          </div>
+          <div className="card-actions">
+            {watched ? <span className="pill pill-good">Watching</span> : null}
+            <button
+              type="button"
+              className={watched ? undefined : "primary"}
+              disabled={busy}
+              onClick={() => void onToggleWatch()}
+            >
+              {watched ? "Unwatch" : "Watch"}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="card">
         <h2>Assets ({assetsTotal})</h2>
         <p className="desc">Scope filter — IN is what notifications cover.</p>
-        <div role="group" aria-label="Scope filter">
-          {(["IN", "OUT", "ALL"] as Scope[]).map((tab) => (
-            <span key={tab}>
-              <button
-                type="button"
-                aria-pressed={tab === scope}
-                className={tab === scope ? "seg-active" : undefined}
-                onClick={() => {
-                  setScope(tab);
-                }}
-              >
-                {tab}
-              </button>{" "}
-            </span>
-          ))}
-        </div>
+        <Segmented
+          label="Scope filter"
+          value={scope}
+          options={[
+            { value: "IN", label: "In scope" },
+            { value: "OUT", label: "Out of scope" },
+            { value: "ALL", label: "All" },
+          ]}
+          onChange={setScope}
+        />
         {assets.length === 0 ? (
-          <p className="desc">No {scope}-scope assets.</p>
+          <p className="empty">
+            {scope === "IN"
+              ? "No in-scope assets."
+              : scope === "OUT"
+                ? "No out-of-scope assets."
+                : "No assets."}
+          </p>
         ) : (
           <ul className="clean">
             {assets.map((a) => (
@@ -292,64 +300,36 @@ export default function ProgramDetailPage(): ReactNode {
             ))}
           </ul>
         )}
-        <p className="small">
-          Page {assetsPage} of {assetsPages}
-          {assetsPage > 1 ? (
-            <>
-              {" "}
-              <button
-                type="button"
-                onClick={() => void loadAssets(scope, assetsPage - 1)}
-              >
-                Prev
-              </button>
-            </>
-          ) : null}
-          {assetsPage < assetsPages ? (
-            <>
-              {" "}
-              <button
-                type="button"
-                onClick={() => void loadAssets(scope, assetsPage + 1)}
-              >
-                Next
-              </button>
-            </>
-          ) : null}
-        </p>
+        <Pager
+          page={assetsPage}
+          pages={assetsPages}
+          summary={`Page ${assetsPage} of ${assetsPages}`}
+          onPrev={() => void loadAssets(scope, assetsPage - 1)}
+          onNext={() => void loadAssets(scope, assetsPage + 1)}
+        />
       </div>
 
       <div className="card">
         <h2>Changes ({changesTotal})</h2>
         <p className="desc">Newest first.</p>
-        <div role="group" aria-label="Changes time window">
-          {(["7d", "24h", "all"] as SincePreset[]).map((preset) => (
-            <span key={preset}>
-              <button
-                type="button"
-                aria-pressed={preset === since}
-                className={preset === since ? "seg-active" : undefined}
-                onClick={() => {
-                  setSince(preset);
-                }}
-              >
-                {preset === "all"
-                  ? "All time"
-                  : preset === "24h"
-                    ? "Last 24h"
-                    : "Last 7 days"}
-              </button>{" "}
-            </span>
-          ))}
-        </div>
+        <Segmented
+          label="Changes time window"
+          value={since}
+          options={[
+            { value: "7d", label: "Last 7 days" },
+            { value: "24h", label: "Last 24h" },
+            { value: "all", label: "All time" },
+          ]}
+          onChange={setSince}
+        />
         {changes.length === 0 ? (
-          <p className="desc">No changes in this window.</p>
+          <p className="empty">No changes in this window.</p>
         ) : (
           <ul className="clean">
             {changes.map((c) => (
               <li key={c.id}>
                 <span>
-                  {changeSign(c.type)} {c.type}{" "}
+                  <span className={pillClass(c.type)}>{typeLabel(c.type)}</span>{" "}
                   <span className="small">
                     {c.assetIdentifier ?? "program"} · {formatDateTime(c.detectedAt)}
                   </span>
@@ -358,34 +338,16 @@ export default function ProgramDetailPage(): ReactNode {
             ))}
           </ul>
         )}
-        <p className="small">
-          Page {changesPage} of {changesPages}
-          {changesPage > 1 ? (
-            <>
-              {" "}
-              <button
-                type="button"
-                onClick={() => void loadChanges(since, changesPage - 1)}
-              >
-                Prev
-              </button>
-            </>
-          ) : null}
-          {changesPage < changesPages ? (
-            <>
-              {" "}
-              <button
-                type="button"
-                onClick={() => void loadChanges(since, changesPage + 1)}
-              >
-                Next
-              </button>
-            </>
-          ) : null}
-        </p>
+        <Pager
+          page={changesPage}
+          pages={changesPages}
+          summary={`Page ${changesPage} of ${changesPages}`}
+          onPrev={() => void loadChanges(since, changesPage - 1)}
+          onNext={() => void loadChanges(since, changesPage + 1)}
+        />
       </div>
 
-      {error ? <p className="error">{error}</p> : null}
+      {error ? <p className="error-banner">{error}</p> : null}
     </>
   );
 
@@ -393,9 +355,7 @@ export default function ProgramDetailPage(): ReactNode {
     return (
       <>
         <PublicNav />
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "1.5rem 1rem 2rem" }}>
-          {body}
-        </div>
+        <div className="page-wrap">{body}</div>
       </>
     );
   }
@@ -404,7 +364,11 @@ export default function ProgramDetailPage(): ReactNode {
     <div className="shell">
       <Sidebar email={user.email} onSignOut={() => void onLogout()} />
       <div className="content">
-        <Topbar title={program.name} email={user.email} />
+        <Topbar
+          title={program.name}
+          subtitle={`${program.platform} · ${program.externalId}`}
+          email={user.email}
+        />
         {body}
       </div>
     </div>
