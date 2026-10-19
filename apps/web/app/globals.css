@@ -326,57 +326,6 @@ a {
   color: var(--accent-hover);
 }
 
-/* Use-case icon tile. */
-.icon-tile {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 10px;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border: 1px solid var(--border);
-  margin-bottom: 0.75rem;
-}
-
-.section-title {
-  text-align: center;
-  font-size: 1.5rem;
-  margin: 0.5rem 0 1.25rem;
-}
-
-/* Wide CTA banner. */
-.cta-banner {
-  text-align: center;
-  padding: 2.5rem 1.5rem;
-}
-
-.cta-banner h2 {
-  font-size: 1.5rem;
-}
-
-.card.cta-banner p.desc {
-  max-width: 480px;
-  margin: 0 auto 1rem;
-  text-align: center;
-}
-
-.btn-accent {
-  display: inline-block;
-  text-decoration: none;
-  background: var(--accent-gradient);
-  border: 1px solid transparent;
-  color: var(--on-accent);
-  font-weight: 600;
-  padding: 0.7rem 1.5rem;
-  border-radius: 8px;
-}
-
-.btn-accent:hover {
-  filter: brightness(1.08);
-}
-
 .avatar {
   width: 2rem;
   height: 2rem;
@@ -429,17 +378,6 @@ a {
   align-items: center;
   gap: 0.6rem;
   flex-shrink: 0;
-}
-
-.feature-card {
-  transition:
-    border-color 0.15s ease,
-    transform 0.15s ease;
-}
-
-.feature-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-  transform: translateY(-2px);
 }
 
 .card h2 {
@@ -945,135 +883,6 @@ table.table tr:last-child td {
   background: var(--bad-soft);
 }
 
-/* Landing page. */
-.hero {
-  text-align: center;
-  padding: 4.5rem 1.25rem 2.5rem;
-  background: radial-gradient(
-    70% 60% at 50% 0%,
-    rgba(6, 182, 212, 0.12),
-    transparent 65%
-  );
-}
-
-.eyebrow {
-  margin: 0 0 0.85rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.hero h1 {
-  font-size: clamp(2.3rem, 5vw, 3.4rem);
-  line-height: 1.08;
-  margin: 0 0 0.75rem;
-}
-
-.accent {
-  color: var(--accent);
-}
-
-.hero p {
-  color: var(--muted);
-  font-size: 1.1rem;
-  max-width: 560px;
-  margin: 0 auto 1.5rem;
-}
-
-.hero .cta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  justify-content: center;
-}
-
-.hero .cta a {
-  text-decoration: none;
-  padding: 0.7rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  border: 1px solid var(--border);
-  color: var(--text);
-}
-
-.hero .cta a.primary {
-  background: var(--accent-gradient);
-  border-color: transparent;
-  color: var(--on-accent);
-}
-
-.hero .cta a.primary:hover {
-  filter: brightness(1.08);
-}
-
-.features {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  margin: 0 0 1.5rem;
-}
-
-.features .card {
-  margin-bottom: 0;
-}
-
-.steps {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  list-style: none;
-  margin: 0 0 2.5rem;
-  padding: 0;
-}
-
-.steps li {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.25rem;
-}
-
-.steps h3 {
-  margin: 0 0 0.35rem;
-  font-size: 1.05rem;
-}
-
-.steps p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.92rem;
-}
-
-.step-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  margin-bottom: 0.75rem;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.site-foot {
-  text-align: center;
-  color: var(--muted);
-  font-size: 0.85rem;
-  padding: 0.5rem 1rem 2.5rem;
-}
-
-@media (max-width: 900px) {
-  .features,
-  .steps {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 720px) {
   .shell {
     flex-direction: column;
@@ -1481,10 +1290,6 @@ button.auth-link-btn:hover {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
-  }
-
-  .feature-card {
-    transition: none;
   }
 
   .auth-spinner {
