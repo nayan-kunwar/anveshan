@@ -7,7 +7,6 @@ import RadarLogo from "./RadarLogo";
 import ThemeToggle from "./ThemeToggle";
 
 const LINKS = [
-  { href: "/", label: "Home" },
   { href: "/programs", label: "Programs" },
   { href: "/changes", label: "Changes" },
 ];
@@ -28,7 +27,7 @@ export default function PublicNav(): ReactNode {
             Anveshan
           </Link>
         </div>
-        <div className="public-links">
+        <nav className="public-links" aria-label="Main">
           {LINKS.map((link) => (
             <Link
               key={link.href}
@@ -39,10 +38,12 @@ export default function PublicNav(): ReactNode {
               {link.label}
             </Link>
           ))}
-          <Link href="/login" className="btn-accent nav-signin">
-            Sign in
-          </Link>
+        </nav>
+        <div className="public-actions">
           <ThemeToggle />
+          <Link href="/login" className="nav-signin">
+            Sign in →
+          </Link>
         </div>
       </div>
     </header>
