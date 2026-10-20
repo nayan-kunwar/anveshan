@@ -317,15 +317,6 @@ a {
   font-weight: 600;
 }
 
-/* Bare links that opt out of the browser-default underline. */
-.plain-link {
-  text-decoration: none;
-}
-.plain-link:hover {
-  text-decoration: none;
-  color: var(--accent-hover);
-}
-
 .avatar {
   width: 2rem;
   height: 2rem;
@@ -719,6 +710,7 @@ label.row {
   height: 20px;
   border-radius: 50%;
   background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   transition: transform 0.15s ease;
 }
 

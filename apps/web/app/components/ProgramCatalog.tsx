@@ -149,11 +149,11 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
             <table className="table">
               <thead>
                 <tr>
-                  <th>Program</th>
-                  <th>Handle</th>
-                  <th>Platform</th>
-                  <th>Tracked</th>
-                  {user ? <th>Watch</th> : null}
+                  <th scope="col">Program</th>
+                  <th scope="col">Handle</th>
+                  <th scope="col">Platform</th>
+                  <th scope="col">Tracked</th>
+                  {user ? <th scope="col">Watch</th> : null}
                 </tr>
               </thead>
               <tbody>

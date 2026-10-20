@@ -3,7 +3,10 @@ import { savedThemeScript } from "./components/themeScript";
 import "./globals.css";
 
 export const metadata = {
-  title: "Anveshan",
+  title: {
+    default: "Anveshan",
+    template: "%s · Anveshan",
+  },
   description: "Bug-bounty program and scope change monitoring",
 };
 

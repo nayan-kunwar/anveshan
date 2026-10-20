@@ -140,11 +140,11 @@ export default function ChangesPage(): ReactNode {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Change</th>
-                  <th>Asset</th>
-                  <th>Program</th>
-                  <th>Platform</th>
-                  <th>Time</th>
+                  <th scope="col">Change</th>
+                  <th scope="col">Asset</th>
+                  <th scope="col">Program</th>
+                  <th scope="col">Platform</th>
+                  <th scope="col">Time</th>
                 </tr>
               </thead>
               <tbody>
