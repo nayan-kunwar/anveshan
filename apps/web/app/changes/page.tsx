@@ -110,7 +110,7 @@ export default function ChangesPage(): ReactNode {
   const body = (
     <>
       <div className="card">
-        <h2>Changes ({total})</h2>
+        {user ? <h2>Changes ({total})</h2> : <h1>Changes ({total})</h1>}
         <p className="desc">Newest detected changes across all programs.</p>
         <div className="filters">
           <Segmented

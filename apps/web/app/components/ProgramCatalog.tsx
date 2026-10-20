@@ -93,7 +93,7 @@ export default function ProgramCatalog({ user }: { user: User | null }): ReactNo
   return (
     <>
       <div className="card">
-        <h2>Programs ({total})</h2>
+        {user ? <h2>Programs ({total})</h2> : <h1>Programs ({total})</h1>}
         <p className="desc">
           Every program in the HackerOne catalog. Search across all programs.
         </p>
