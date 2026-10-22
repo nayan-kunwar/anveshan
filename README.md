@@ -305,8 +305,8 @@ See:
 ## Project Status
 
 Done: collector MVP (real HackerOne collection, diff, persist, read-only
-API) and email notifications (magic-link auth, subscriptions with watches,
-outbox-based SMTP delivery, Next.js subscriber app).
+API), email notifications (magic-link auth, subscriptions with watches,
+outbox-based SMTP delivery, Next.js subscriber app), and frontend experience
+(landing page, dark/light theme, responsive sidebar dashboard).
 
-Current milestone: frontend experience — restyling the subscriber app
-without changing API contracts or notification semantics.
+Milestones 1–3 are complete. The next milestone is not defined yet.

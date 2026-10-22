@@ -10,35 +10,31 @@ The system collects program and scope information from authorized bug-bounty pla
 
 # 1. Current Milestone
 
-The collector MVP (Milestone 1) is complete: real HackerOne collection,
-diff, persist, read-only API.
+Milestones 1–3 are complete.
 
-The current milestone is Milestone 2: email notifications.
-
-Milestone 2 adds (see `docs/notification-design.md`):
-
-- magic-link authentication (no passwords)
-- subscriptions with per-program watches + immediate/daily cadence
-- outbox-based email delivery via generic SMTP (nodemailer)
-- minimal Next.js frontend (login, dashboard, unsubscribe)
+- Milestone 1 (collector MVP): real HackerOne collection, diff, persist,
+  read-only API.
+- Milestone 2 (email notifications): magic-link authentication, subscriptions
+  with per-program watches + immediate/daily cadence, outbox-based email
+  delivery via generic SMTP, minimal Next.js frontend (login, dashboard,
+  unsubscribe). See `docs/notification-design.md`.
+- Milestone 3 (frontend experience): dark/light theme, sidebar dashboard, and
+  landing page. API contracts, notification semantics, and the filter matrix
+  are unchanged; no new endpoints, tables, or styling dependencies were added.
 
 Milestone 1 rules stay frozen: the collector, diff engine, change types
 (PROGRAM_ADDED, ASSET_ADDED, ASSET_REMOVED), and `runCollection()` core
 are unchanged. Notifications are a post-collection side effect only —
 SMTP never runs inside the collection lock.
 
-The current milestone is Milestone 3: frontend experience.
-
-Milestone 3 restyles the Next.js subscriber app (dark/light theme,
-sidebar dashboard, landing page) without changing API contracts,
-notification semantics, or the filter matrix. No new endpoints, no new
-tables, no new dependencies for styling.
+No next milestone is defined yet. Do not begin new feature work until one
+is agreed.
 
 ---
 
 # 2. Explicitly Out of Scope
 
-Do NOT implement any of the following in the current milestone:
+Do NOT implement any of the following without an explicit milestone decision:
 
 - Web scraping
 - RSS collectors
