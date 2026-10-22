@@ -523,6 +523,19 @@ re-filter). Do not use `sent` for that — ops would think SMTP succeeded.
 | 3       | 240s (2^2 * 60) | 5min       |
 | fail    | —               | —          |
 
+### Delivery semantics (at-least-once)
+
+The outbox guarantees **at-least-once**, not exactly-once, delivery. If the
+transport accepts the message but the process dies — or the `markDeliverySent`
+write fails — before the row leaves `sending`, stale recovery returns it to
+`pending` after 10 minutes and the message is sent again.
+
+The drain mutex and the `FOR UPDATE SKIP LOCKED` claim prevent _concurrent_
+double sends, but they cannot close the window between the external send and
+the `sent` update. A crash in that window can produce one duplicate; silently
+dropping the notification instead is considered worse. `attempts` and
+`last_error` stay on the row for audit.
+
 ---
 
 ## Daily window
