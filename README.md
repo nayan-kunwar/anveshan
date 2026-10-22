@@ -290,6 +290,7 @@ See:
 - [`docs/api.md`](docs/api.md)
 - [`docs/running.md`](docs/running.md)
 - [`docs/deploy.md`](docs/deploy.md)
+- [`docs/milestone-4-operations.md`](docs/milestone-4-operations.md)
 - [`docs/notification-design.md`](docs/notification-design.md)
 - [`docs/notifications.md`](docs/notifications.md)
 - [`docs/daily-digest.md`](docs/daily-digest.md)
@@ -309,4 +310,6 @@ API), email notifications (magic-link auth, subscriptions with watches,
 outbox-based SMTP delivery, Next.js subscriber app), and frontend experience
 (landing page, dark/light theme, responsive sidebar dashboard).
 
-Milestones 1–3 are complete. The next milestone is not defined yet.
+Milestones 1–3 are complete. Milestone 4 (production operations) is planned
+but not started — see
+[`docs/milestone-4-operations.md`](docs/milestone-4-operations.md).

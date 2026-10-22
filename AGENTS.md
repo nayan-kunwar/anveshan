@@ -27,8 +27,9 @@ Milestone 1 rules stay frozen: the collector, diff engine, change types
 are unchanged. Notifications are a post-collection side effect only —
 SMTP never runs inside the collection lock.
 
-No next milestone is defined yet. Do not begin new feature work until one
-is agreed.
+Milestone 4 (production operations) is planned in
+`docs/milestone-4-operations.md`. Do not begin it until its open decisions
+are settled.
 
 ---
 
