@@ -123,6 +123,11 @@ match HackerOne after commit (so `GET /programs/:id/assets` is truthful).
     `changes` and avoids reaping display history)
 - Do **not** mark-missing assets on programs absent from this fetch.
 
+Ordering note: reconciliation writes `OUT`, but it does not feed the diff.
+`diffProgram()` receives the previous-state map loaded at the start of the
+persist transaction (§6), so a missing asset is still reported as
+`ASSET_REMOVED` even though its live row has already been flipped.
+
 ## 6. Collection run (pseudocode)
 
 HTTP stays **outside** the persist transaction. Collection Service lives
@@ -237,3 +242,20 @@ Changes:
 
 `changes` rows store `asset_identifier` (display) + `asset_key`
 (stable) + `asset_id` FK.
+
+## 9. Diff engine code map
+
+| Concern                                                     | Implementation                                                                                                                        | Tests                                       |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Per-program set diff (`programAdded`, `added`, `removed`)   | `packages/domain/src/diff.ts` (`diffProgram`)                                                                                         | `packages/domain/test/diff.test.ts`         |
+| Canonical diff key and program key                          | `packages/domain/src/types.ts` (`assetKey`, `programKey`)                                                                             | `packages/domain/test/diff.test.ts`         |
+| Identifier canonicalization (§3)                            | `packages/domain/src/canonicalize.ts` (`canonicalize`), called from the collector normalizer in `packages/collector/src/collector.ts` | `packages/domain/test/canonicalize.test.ts` |
+| Baseline detection, preload, upsert, reconcile, change rows | `apps/api/src/collection/service.ts` (`runCollection`)                                                                                | `apps/api/test/collection.test.ts`          |
+| Missing rows flipped to `OUT` (§5b)                         | `packages/database/src/repositories.ts` (`markMissingAssetsOut`)                                                                      | `apps/api/test/collection.test.ts`          |
+| Duplicate backstop (§7)                                     | `packages/database/src/repositories.ts` (`insertChange`) and the partial indexes in `packages/database/src/schema.ts`                 | `apps/api/test/collection.test.ts`          |
+| Overlap lock and stale-run recovery                         | `packages/database/src/db.ts` (`tryAdvisoryLock`) and `runCollection`                                                                 | `apps/api/test/collection.test.ts`          |
+| Live HackerOne verification                                 | `apps/api/test/collection.live.test.ts` (`pnpm test:live`)                                                                            | —                                           |
+
+Section mapping: identity and type changes §2, canonicalization §3, scope
+filtering §4, program rules §5, reconciliation §5b, run order §6, idempotency
+§7, worked example §8.
