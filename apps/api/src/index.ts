@@ -65,7 +65,7 @@ async function main(): Promise<void> {
     adminService: createAdminService({ config, pool, logger, db, scheduler }),
   });
   const server = app.listen(config.PORT, () => {
-    logger.info({ port: config.PORT }, "anveshan api listening");
+    logger.info({ port: config.PORT, node: process.version }, "anveshan api listening");
   });
 
   let shuttingDown = false;

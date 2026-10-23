@@ -60,7 +60,7 @@ Web scraping, RSS, webhooks, and other collectors are planned for later mileston
 
 ## Technology Stack
 
-- Node.js
+- Node.js 24.22.1+
 - TypeScript
 - Express.js
 - PostgreSQL

@@ -7,7 +7,7 @@ Commands run from the repo root unless noted.
 
 ## 1. Prerequisites
 
-- Node.js 20+
+- Node.js 24.22.1+
 - pnpm 9+
 - Docker + Docker Compose
 - HackerOne account + API token (https://hackerone.com/settings/api_token) —

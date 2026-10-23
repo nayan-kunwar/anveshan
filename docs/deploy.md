@@ -77,7 +77,7 @@ option off) — set these fields exactly:
 | Root Directory     | _(empty — monorepo root, not `apps/api`)_                                |
 | Build Command      | `pnpm install --frozen-lockfile && pnpm --filter @anveshan/api... build` |
 | Start Command      | `node apps/api/dist/index.js`                                            |
-| Env `NODE_VERSION` | `22` (matches `apps/api/Dockerfile`; Render's default 24 works too)      |
+| Env `NODE_VERSION` | `24.22.1` (pinned; matches `apps/api/Dockerfile` and `.nvmrc`)           |
 
 Never put `corepack enable` in the Build Command: Render's `/usr/bin`
 is read-only, corepack fails with `EROFS: read-only file system`, and
@@ -86,6 +86,15 @@ the build dies before `pnpm install`. Render detects pnpm from
 shim. The scoped `--filter @anveshan/api...` build compiles the API
 and its workspace dependencies only, skipping the Next.js build (and
 its memory cost) on an API-only service.
+
+`NODE_VERSION` must stay pinned to a full patch release, not `22` or
+`24`. The October 2026 security release fixed several HIGH CVEs in the
+22.x, 24.x, and 26.x lines; floating majors can silently fall back to a
+vulnerable build. `.nvmrc`, CI, both Dockerfiles, and the Render env var
+must all name the same version. After deploying, confirm it in the
+Render logs — the API startup line includes `node: "v24.22.1"`:
+
+    {"level":30,...,"port":3000,"node":"v24.22.1","msg":"anveshan api listening"}
 
 After the first green deploy, run once in **Render Shell**:
 `pnpm db:migrate`. Do not set `PORT` (Render injects it; Express
