@@ -115,11 +115,77 @@ These need dashboard access; pairing steps will be provided.
 
 ## 6. Open decisions
 
-- [ ] Hosting: Render Starter (~$7/mo) vs. Fly.io / Railway.
-- [ ] Cadence: hourly vs. every 30 minutes.
-- [ ] Monitoring: hosted dead-man's-switch service vs. GitHub Actions checks.
-- [ ] Mail: Brevo + domain sender vs. keep the current provider.
-- [ ] Database: stay on the current plan vs. upgrade for PITR/backups.
+These are not code questions. Each needs a billing, account, or risk
+decision from the operator, and `AGENTS.md` §1 keeps M4 paused until
+they are settled. Nothing is broken while they are open: the local
+keep-alive holds the free Render instance awake and the Node 24.22.1
+security patch is live. But collection stays manual and mail only flows while the
+process is awake.
+
+### 6.1 Hosting
+
+- [ ] **Decision:** Render Starter (~$7/mo) vs. Fly.io / Railway.
+- **Why:** the free tier sleeps after ~15 minutes idle, which stops the
+  scheduler, outbox worker, and digest tick. This is the root problem
+  M4 exists to fix.
+- **Recommendation:** Render Starter — same platform, least migration
+  work.
+- **Needed from operator:** choose a provider and approve the spend.
+
+### 6.2 Collection cadence
+
+- [ ] **Decision:** hourly vs. every 30 minutes.
+- **Why:** a full run takes ~26.5 minutes. A 30-minute schedule overlaps
+  and the advisory lock skips the second trigger, so it behaves like
+  hourly with more noise.
+- **Recommendation:** hourly (`COLLECTION_CRON=0 * * * *`).
+- **Needed from operator:** confirm the interval.
+
+### 6.3 Monitoring and alerting
+
+- [ ] **Decision:** hosted dead-man's-switch vs. GitHub Actions checks.
+- **Why:** acceptance requires a dead process or stale scheduler to
+  alert within 15 minutes. Something external must watch the API.
+- **Recommendation:** hosted heartbeat (e.g. Healthchecks.io free tier),
+  pinged after each completed run and `/fail` on failure, plus an
+  uptime check on `/health`.
+- **Needed from operator:** create the check/account and provide the
+  alert email. GitHub scheduled workflows proved unreliable here (the
+  removed keep-alive fired once in four hours), so they are not the
+  primary mechanism.
+
+### 6.4 Production mail
+
+- [ ] **Decision:** Brevo + sender on `nayankunwar.com` vs. keep the
+      current provider.
+- **Why:** magic-link login and change notifications depend on
+  deliverability.
+- **Recommendation:** Brevo with SPF, DKIM, and DMARC records on the
+  domain.
+- **Needed from operator:** choose the provider and confirm DNS access.
+
+### 6.5 Database recovery
+
+- [ ] **Decision:** stay on the current plan with scheduled `pg_dump`
+      backups vs. upgrade for PITR/backups.
+- **Why:** acceptance requires an exercised restore. Without backups, a
+  bad deploy or deletion is unrecoverable.
+- **Recommendation:** at minimum scheduled dumps plus one restore drill;
+  upgrade if the current plan has no PITR.
+- **Needed from operator:** confirm the current plan and approve any
+  spend.
+
+### 6.6 What stays blocked
+
+Until 6.1 is settled, the scheduler cannot be enabled safely, because
+the free instance will sleep and miss runs. Until 6.3 is settled, the
+"alert within 15 minutes" criterion cannot be demonstrated. Until 6.4
+and 6.5 are settled, the mail and restore criteria cannot be signed
+off.
+
+Work that does not depend on these decisions (runbook drafting,
+`HEARTBEAT_URL` plumbing, scheduler config) can be scoped, but
+implementation stays paused until the decisions are recorded here.
 
 ## 7. Out of scope
 
