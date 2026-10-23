@@ -103,14 +103,15 @@ already honours it).
 ### Free-tier keep-alive
 
 Render's free web service sleeps after ~15 minutes without traffic, which
-also stops `node-cron`, the delivery worker, and the digest tick. While the
-API is on the free tier, `.github/workflows/keep-alive.yml` pings `/health`
-every 5 minutes to keep it awake.
+also stops `node-cron`, the delivery worker, and the digest tick. The
+GitHub Actions keep-alive was removed after its scheduler proved
+unreliable (one run in four hours). Until the API moves to an always-on
+instance, the stopgap is a local 5-minute ping of `/health` from the
+operator's machine (Windows Task Scheduler); it only covers periods when
+that machine is awake.
 
-Scheduled workflows run from the default branch only, so it activates after
-the workflow is pushed to `main`. GitHub can delay scheduled runs under load,
-and a delayed ping can still produce a cold start. This is a keep-alive, not
-an alert — pair it with the uptime check in
+A delayed or missed ping still produces a cold start. This is a
+keep-alive, not an alert — pair it with the uptime check in
 [`milestone-4-operations.md`](milestone-4-operations.md) §3.4.
 
 ---
